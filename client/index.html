@@ -1,0 +1,4585 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>304호 탈출</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=Gowun+Dodum&display=swap">
+<style>
+/* Layout: 가운데 게임 화면(15x11 타일) 위에 HUD·대화창·선택지·메뉴·퀴즈·엔딩이 겹쳐 뜬다. 밤 분위기의 단일 어두운 테마. */
+:root {
+  --bg: #0B0A12;
+  --win1: #24357A;
+  --win2: #0D1440;
+  --winline: #F4F1E8;
+  --text: #FFFFFF;
+  --muted: #B9C0E0;
+  --accent: #FFD25E;
+  --danger: #FF4D5E;
+  --ok: #5EE6A0;
+  --font: "Gowun Dodum", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --title: "Do Hyeon", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; display: flex; flex-direction: column; align-items: center; gap: 10px;
+  padding: max(12px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) max(12px, env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px)); }
+[hidden] { display: none !important; }
+button { font: inherit; color: inherit; }
+.stage { position: relative; width: min(100%, 960px); aspect-ratio: 15 / 11; background: #000; border: 4px solid #2B2840; box-shadow: 0 0 0 2px #000, 0 10px 40px rgba(0, 0, 0, 0.6); overflow: hidden; user-select: none; -webkit-user-select: none; }
+#game { display: block; width: 100%; height: 100%; image-rendering: pixelated; image-rendering: crisp-edges; }
+#danger { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at center, transparent 40%, rgba(255, 20, 40, 0.6) 100%); opacity: 0; transition: opacity 0.3s; }
+.hud { position: absolute; top: 8px; left: 8px; right: 8px; display: flex; justify-content: space-between; align-items: flex-start; pointer-events: none; gap: 8px; }
+.hud .l { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; min-width: 0; }
+.hud .r { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.pill { background: rgba(13, 20, 64, 0.85); border: 2px solid var(--winline); border-radius: 6px; padding: 2px 10px; font-size: clamp(11px, 1.6vw, 14px); white-space: nowrap; }
+#hud-obj { white-space: normal; max-width: 70%; color: var(--accent); }
+.menubtn { pointer-events: auto; cursor: pointer; }
+#loc, #alert { position: absolute; left: 50%; transform: translateX(-50%); font-family: var(--title); background: rgba(13, 20, 64, 0.9); border: 2px solid var(--winline); border-radius: 8px; padding: 6px 22px; opacity: 0; transition: opacity 0.4s; pointer-events: none; white-space: nowrap; max-width: 92%; overflow: hidden; text-overflow: ellipsis; }
+#loc { top: 22%; font-size: clamp(18px, 3.4vw, 30px); }
+#alert { top: 36%; font-size: clamp(15px, 2.8vw, 24px); }
+#loc.on, #alert.on { opacity: 1; }
+#fade { position: absolute; inset: 0; background: #000; opacity: 0; transition: opacity 0.2s; pointer-events: none; }
+#fade.on { opacity: 1; }
+#hidebox { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.8); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; font-size: clamp(14px, 2.4vw, 20px); text-align: center; padding: 16px; }
+#hidebox .slit { width: 60%; height: 10px; background: repeating-linear-gradient(90deg, #6F849A 0 18px, #000 18px 22px); }
+
+.win { background: linear-gradient(180deg, var(--win1) 0%, var(--win2) 100%); border: 3px solid var(--winline); border-radius: 8px; box-shadow: 0 0 0 2px #000, inset 0 0 0 2px rgba(0, 0, 0, 0.35); }
+#dlg { position: absolute; left: 2%; right: 2%; bottom: 3%; min-height: 30%; display: flex; gap: 12px; padding: 12px 16px; }
+#dlg.boss { background: linear-gradient(180deg, #5A1020 0%, #1E0408 100%); border-color: #FFB3BD; }
+#dlg-face { flex: none; width: clamp(48px, 9vw, 88px); align-self: flex-start; }
+#dlg-face canvas { width: 100%; height: auto; image-rendering: pixelated; background: rgba(0, 0, 0, 0.25); border: 2px solid rgba(255, 255, 255, 0.6); border-radius: 4px; display: block; }
+#dlg-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+#dlg-name { font-family: var(--title); color: var(--accent); font-size: clamp(14px, 2.2vw, 20px); }
+#dlg-text { font-size: clamp(13px, 2.1vw, 19px); line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; min-height: 3.2em; }
+#dlg-more { position: absolute; right: 14px; bottom: 6px; color: var(--accent); font-size: 14px; }
+@media (prefers-reduced-motion: no-preference) {
+  #dlg-more { animation: bob 0.8s ease-in-out infinite; }
+  @keyframes bob { 50% { transform: translateY(3px); } }
+}
+#choice { position: absolute; right: 3%; bottom: calc(3% + 32% + 8px); padding: 8px 6px; min-width: 40%; max-width: 70%; max-height: 52%; overflow-y: auto; }
+#choice ul, #menu-ul { list-style: none; margin: 0; padding: 0; }
+#choice li, #menu-ul li { padding: 4px 14px 4px 26px; position: relative; cursor: pointer; font-size: clamp(12px, 1.9vw, 17px); border-radius: 4px; overflow-wrap: anywhere; }
+#choice li.sel, #menu-ul li.sel { background: rgba(255, 255, 255, 0.14); }
+#choice li.sel::before, #menu-ul li.sel::before { content: "▶"; position: absolute; left: 8px; color: var(--accent); font-size: 0.8em; top: 0.35em; }
+.inform { position: absolute; left: 2%; right: 2%; bottom: calc(3% + 30% + 8px); display: flex; gap: 8px; padding: 8px; }
+.inform input { flex: 1; min-width: 0; font: inherit; font-size: clamp(13px, 2vw, 17px); padding: 6px 10px; border: 2px solid var(--winline); border-radius: 4px; background: #070B26; color: var(--text); }
+#code-in { letter-spacing: 0.4em; text-align: center; font-family: var(--title); font-size: clamp(18px, 3vw, 26px); }
+.wbtn { background: #0A1035; border: 2px solid var(--winline); border-radius: 4px; padding: 4px 12px; cursor: pointer; font-size: clamp(12px, 1.9vw, 16px); white-space: nowrap; }
+.wbtn:hover, .wbtn:focus-visible { background: #22307A; outline: none; }
+.wbtn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+#menu { position: absolute; inset: 4%; display: flex; gap: 10px; }
+#menu-list { width: 28%; min-width: 118px; padding: 10px 6px; flex: none; }
+#menu-panel { flex: 1; min-width: 0; padding: 12px 14px; overflow-y: auto; font-size: clamp(12px, 1.8vw, 16px); }
+#menu-panel h3 { margin: 0 0 8px; font-family: var(--title); font-weight: 400; color: var(--accent); font-size: clamp(16px, 2.6vw, 22px); }
+.roster { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 8px; }
+.roster button { background: rgba(0, 0, 0, 0.25); border: 2px solid rgba(255, 255, 255, 0.35); border-radius: 4px; padding: 4px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; position: relative; }
+.roster button:hover, .roster button:focus-visible { border-color: var(--accent); outline: none; }
+.roster button.stamped { border-color: var(--ok); }
+.roster button.stamped::after { content: "출석"; position: absolute; top: 2px; right: 2px; font-size: 10px; background: var(--danger); color: #fff; padding: 0 4px; border-radius: 3px; transform: rotate(8deg); }
+.roster canvas { width: 100%; height: auto; image-rendering: pixelated; }
+.roster .q canvas { filter: brightness(0); opacity: 0.55; }
+.roster span { font-size: 12px; }
+.prow { display: grid; grid-template-columns: 7.5em minmax(0, 1fr); gap: 8px; padding: 4px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.15); }
+.prow b { color: var(--muted); font-weight: 400; }
+.prow span { overflow-wrap: anywhere; }
+.phead { display: flex; gap: 12px; align-items: center; margin-bottom: 8px; }
+.phead canvas { width: 72px; height: auto; image-rendering: pixelated; border: 2px solid rgba(255, 255, 255, 0.5); border-radius: 4px; }
+.phead .nm { font-family: var(--title); font-size: 24px; }
+.field { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+.field input { flex: 1 1 200px; min-width: 0; font: inherit; padding: 6px 10px; border: 2px solid var(--winline); border-radius: 4px; background: #070B26; color: var(--text); }
+.small { font-size: 0.85em; color: var(--muted); }
+.quest { padding: 6px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.15); }
+.quest .qt { display: flex; gap: 8px; align-items: baseline; }
+.quest .st { font-size: 0.8em; padding: 0 6px; border-radius: 3px; border: 1px solid currentColor; white-space: nowrap; }
+.quest .st.done { color: var(--ok); }
+.quest .st.go { color: var(--accent); }
+.quest .st.no { color: var(--muted); }
+.item { display: flex; gap: 10px; align-items: baseline; padding: 6px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.15); }
+.item b { color: var(--accent); white-space: nowrap; }
+.bar2 { height: 8px; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.35); margin: 6px 0 10px; }
+.bar2 i { display: block; height: 100%; background: var(--ok); }
+
+#quiz { position: absolute; top: 9%; left: 4%; right: 4%; max-height: 86%; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; background: linear-gradient(180deg, #4A0E1A 0%, #14040A 100%); border-color: #FFB3BD; }
+#quiz .qhead { display: flex; gap: 12px; align-items: center; }
+#quiz .qhead canvas { width: clamp(48px, 8vw, 72px); height: auto; image-rendering: pixelated; border: 2px solid rgba(255, 180, 190, 0.8); border-radius: 4px; background: #000; }
+#quiz .qtitle { font-family: var(--title); color: #FFB3BD; font-size: clamp(15px, 2.5vw, 22px); }
+#quiz .qsub { font-size: clamp(11px, 1.7vw, 14px); color: var(--muted); }
+#quiz .qtime { margin-left: auto; font-family: var(--title); font-size: clamp(22px, 4vw, 36px); color: var(--accent); font-variant-numeric: tabular-nums; }
+#quiz .qbar { height: 8px; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.4); }
+#quiz .qbar i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, var(--danger), var(--accent)); }
+#quiz .qq { font-size: clamp(14px, 2.3vw, 20px); line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+#quiz .qopt { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Malgun Gothic", monospace; }
+#quiz .qopts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 6px; }
+@media (max-width: 560px) { #quiz .qopts { grid-template-columns: minmax(0, 1fr); } }
+#quiz .qopt { text-align: left; background: #1E0810; border: 2px solid rgba(255, 255, 255, 0.55); border-radius: 6px; padding: 8px 10px; cursor: pointer; font-size: clamp(12px, 1.9vw, 16px); overflow-wrap: anywhere; }
+#quiz .qopt b { color: var(--accent); margin-right: 6px; font-family: var(--title); }
+#quiz .qopt.sel { border-color: var(--accent); background: #4A1424; }
+#quiz .qopt.ok { border-color: var(--ok); background: #0F4B35; }
+#quiz .qopt.no { border-color: var(--danger); background: #4B0F18; }
+#quiz .qopt.gone { opacity: 0.2; pointer-events: none; text-decoration: line-through; }
+#quiz .qtools { display: flex; gap: 8px; align-items: center; }
+
+.screen { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; padding: 16px; }
+#title { background: radial-gradient(ellipse at center, rgba(60, 10, 20, 0.5) 0%, rgba(0, 0, 0, 0.92) 75%); }
+.screen .t { font-family: var(--title); font-size: clamp(38px, 9vw, 80px); line-height: 1; color: #FFF; text-shadow: 4px 4px 0 #6B0F1E, 8px 8px 0 #000; }
+.screen .s { color: var(--muted); font-size: clamp(13px, 2vw, 18px); max-width: 40em; white-space: pre-line; }
+.screen .btns { display: flex; flex-direction: column; gap: 8px; min-width: 220px; }
+.screen .wbtn { font-size: clamp(15px, 2.4vw, 20px); padding: 8px 16px; }
+#over { background: rgba(40, 0, 6, 0.92); overflow-y: auto; }
+#over .s { color: #FFD9DE; }
+#winscr { background: radial-gradient(ellipse at center, rgba(20, 80, 60, 0.7) 0%, rgba(0, 0, 0, 0.92) 75%); }
+#winscr .t { text-shadow: 4px 4px 0 #1C6B4E, 8px 8px 0 #000; }
+.stats { display: grid; grid-template-columns: auto auto; gap: 4px 18px; font-size: clamp(13px, 2vw, 17px); text-align: left; }
+.stats b { color: var(--accent); font-weight: 400; text-align: right; }
+
+.pad { display: none; width: min(100%, 960px); justify-content: space-between; align-items: center; gap: 12px; touch-action: none; user-select: none; -webkit-user-select: none; }
+@media (pointer: coarse), (max-width: 760px) { .pad { display: flex; } }
+.dpad { display: grid; grid-template-columns: repeat(3, 52px); grid-template-rows: repeat(3, 52px); gap: 4px; }
+.dpad button, .ab button { background: #2B2840; border: 2px solid #48446A; color: #fff; border-radius: 10px; font-size: 18px; touch-action: none; }
+.dpad button:active, .ab button:active { background: #48446A; }
+.ab { display: flex; gap: 14px; }
+.ab button { width: 64px; height: 64px; border-radius: 50%; font-family: var(--title); font-size: 22px; }
+.help { color: #8A86A8; font-size: 13px; text-align: center; max-width: 960px; }
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+  <canvas id="game" aria-label="304호 탈출 게임 화면"></canvas>
+  <div id="danger"></div>
+  <div class="hud">
+    <div class="l"><span class="pill" id="hud-loc">304호 교실</span><span class="pill" id="hud-obj"></span></div>
+    <div class="r"><span class="pill" id="hud-att">대화 0/23</span><button type="button" class="pill menubtn" id="hud-snd">소리 켬</button><button type="button" class="pill menubtn" id="hud-menu">메뉴</button></div>
+  </div>
+  <div id="loc"></div>
+  <div id="alert"></div>
+  <div id="hidebox" hidden><div class="slit"></div><div>사물함 안에 숨어 있다… 숨을 죽이자.</div><div class="small">Space(A)로 나오기</div><div class="slit"></div></div>
+  <div class="win" id="dlg" hidden>
+    <div id="dlg-face"><canvas id="dlg-face-cv" width="64" height="56"></canvas></div>
+    <div id="dlg-body"><div id="dlg-name"></div><div id="dlg-text"></div></div>
+    <div id="dlg-more" aria-hidden="true">▼</div>
+  </div>
+  <div class="win" id="choice" hidden><ul id="choice-ul"></ul></div>
+  <form class="win inform" id="chatform" hidden>
+    <input id="chat-in" placeholder="반 친구 정보를 물어보세요" autocomplete="off" aria-label="챗봇에게 질문">
+    <button type="submit" class="wbtn">보내기</button>
+    <button type="button" class="wbtn" id="chat-quit">그만</button>
+  </form>
+  <form class="win inform" id="codeform" hidden>
+    <input id="code-in" inputmode="numeric" maxlength="4" placeholder="····" autocomplete="off" aria-label="정문 비밀번호 4자리">
+    <button type="submit" class="wbtn">입력</button>
+    <button type="button" class="wbtn" id="code-quit">취소</button>
+  </form>
+  <div id="menu" hidden>
+    <div class="win" id="menu-list"><ul id="menu-ul"></ul></div>
+    <div class="win" id="menu-panel"></div>
+  </div>
+  <div class="win" id="quiz" hidden>
+    <div class="qhead"><canvas id="quiz-face" width="64" height="56"></canvas><div><div class="qtitle" id="quiz-title"></div><div class="qsub" id="quiz-sub"></div></div><div class="qtime" id="quiz-time">20.0</div></div>
+    <div class="qbar"><i id="quiz-bar"></i></div>
+    <div class="qq" id="quiz-q"></div>
+    <div class="qopts" id="quiz-opts"></div>
+    <div class="qtools"><button type="button" class="wbtn" id="quiz-chance">50:50 찬스</button><span class="small" id="quiz-tip">숫자 1~4 또는 방향키+Space · 찬스는 5</span></div>
+  </div>
+  <div id="fade"></div>
+  <div class="screen" id="over" hidden>
+    <div class="t">보충 수업…</div>
+    <div class="s" id="over-txt"></div>
+    <div class="btns"><button type="button" class="wbtn" id="over-retry">체크포인트에서 다시</button></div>
+  </div>
+  <div class="screen" id="winscr" hidden>
+    <div class="t">탈출 성공!</div>
+    <div class="s" id="win-txt"></div>
+    <div class="stats" id="win-stats"></div>
+    <div class="btns"><button type="button" class="wbtn" id="win-again">처음부터 다시</button></div>
+  </div>
+  <div class="screen" id="title">
+    <div class="t">304호 탈출</div>
+    <div class="s">SSAFY 16기 서울 7반 · 밤 10시의 멀티캠퍼스 역삼</div>
+    <div class="btns">
+      <button type="button" class="wbtn" id="t-new">처음부터</button>
+      <button type="button" class="wbtn" id="t-cont" hidden>이어하기</button>
+    </div>
+    <div class="s">방향키·WASD 이동 · Space/Enter 대화·조사 · Esc 메뉴 · 소리가 납니다</div>
+  </div>
+</div>
+<div class="pad" aria-label="터치 조작">
+  <div class="dpad">
+    <span></span><button type="button" data-dir="up" aria-label="위">▲</button><span></span>
+    <button type="button" data-dir="left" aria-label="왼쪽">◀</button><span></span><button type="button" data-dir="right" aria-label="오른쪽">▶</button>
+    <span></span><button type="button" data-dir="down" aria-label="아래">▼</button><span></span>
+  </div>
+  <div class="ab"><button type="button" id="btn-b" aria-label="취소, 메뉴">B</button><button type="button" id="btn-a" aria-label="대화, 조사, 확인">A</button></div>
+</div>
+<div class="help">B1 창고에 갇힌 박민희 프로님을 구해 1층 정문으로 함께 탈출하세요. 반 친구들과 304호 7반 봇(RAG)이 단서를 줍니다. 이자룡 강사님에게 잡히면 Django 문제를 맞혀야 하고, 화장실에는 강사님이 들어오지 않습니다. 헤드폰을 권장합니다.</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ================= 데이터 (사용자 제공) ================= */
+  var YEAR = 2026;
+  var CAMPUS = { name: "멀티캠퍼스 역삼", lat: 37.5007, lon: 127.0366 };
+  var CLS = {
+    campus: "멀티캠퍼스", track: "파이썬", region: "서울", cohort: "16기", cls: "7반",
+    teacher: "이자룡", pro: "박민희", total: 23, employed: 0, leader: "이승진", ca: "박소영",
+    room: "서울시 역삼역 멀티캠퍼스 3층 304호", food: "20층 또는 10층", doing: "Django 배우기"
+  };
+  var M = [
+    { n: "차주영", y: 2002, g: "W", maj: ["스페인어", "융복합소프트웨어"], p: "길음동 성북구", pk: ["길음", "성북"], lat: 37.6035, lon: 127.0250, lv: "s", r: "서울", age: "3", nick: "민주동생", hob: ["민주 괴롭히기"], now: "집에 가고 싶다", recent: "마니또 잡아내기", guess: "100퍼센트 고민주다", gift: "비밀" },
+    { n: "한범구", y: 1999, g: "M", maj: ["경영학"], p: "서대문구 홍제동", pk: ["홍제", "서대문"], lat: 37.5890, lon: 126.9435, lv: "s", r: "서울", age: "28", hob: ["사진"], now: "AI랑 놀기", recent: "AI 토큰 녹이기", guess: "예상이 안감", gift: "바삭 달콤한것" },
+    { n: "고민주", y: 2002, g: "W", maj: ["금융수학", "경제학"], p: "언주역", pk: ["언주"], lat: 37.5071, lon: 127.0343, lv: "s", r: "서울", age: "25", hob: ["카페투어", "영화보기"], now: "할거너무많아용 흑흑", recent: "마니또 찾아다니기", guess: "제가 제일 좋아하는 젤리를 주셨어요. 다 겁나 맘에들어요 감사합니다", gift: "과자!" },
+    { n: "이승우", y: 1999, g: "M", maj: ["건설시스템공학"], p: "남양주", pk: ["남양주"], lat: 37.6360, lon: 127.2165, lv: "a", r: "경기", age: "28", hob: ["게임"], now: "기도중", recent: "기사시험 벼락치기", guess: "모르겠음", gift: "먹을 것" },
+    { n: "정재원", y: 1999, g: "M", maj: ["신소재공학"], note: "위켄드 팬", p: "송파구 거여동", pk: ["거여", "송파"], lat: 37.4930, lon: 127.1440, lv: "s", r: "서울", age: "28", hob: ["테니스", "음악감상"], now: "프로젝트 뭘로 해야하나 구상중", recent: "마니또에게 엎드려 절받기로 쪽지 받음", guess: "추측이 아니라 알아버렸는데 안말할래요", gift: "마니또가 원하는 것" },
+    { n: "권아영", y: 1998, g: "W", maj: ["국어국문학", "경영학"], p: "신림", pk: ["신림"], lat: 37.4842, lon: 126.9296, lv: "s", r: "서울", age: "29", hob: ["노래듣기", "여행", "책읽기"], now: "condition nienzo", recent: "열심히 살기", guess: "나랑 프로젝트 같이하고 회식 때 같은 테이블에 앉은 적 있고 초록색 달라고 한 적 있는 사람", gift: "간식, 응원, 관심" },
+    { n: "임형찬", y: 1997, g: "M", maj: ["국제경영"], p: "서울대입구", pk: ["서울대입구", "서울대"], lat: 37.4812, lon: 126.9527, lv: "s", r: "서울", age: "30", hob: ["농구"], now: "싸피에 갇힘", recent: "드장고 외우기", guess: "", gift: "먹을 것과 메모" },
+    { n: "김수진", y: 1999, g: "W", maj: ["언론정보", "경영학"], p: "금천", pk: ["금천"], lat: 37.4553, lon: 126.8947, lv: "a", r: "서울", age: "28", hob: ["드럼 연주", "영화 관람"], now: "심심", recent: "멍 때리기", guess: "감기라는 말에 주섬주섬 챙겨주셨던 나의 마니또!! 일주 동안 너무 고마웠어요", gift: "간식과 관심(?)" },
+    { n: "송현우", y: 2000, g: "M", maj: ["전기전자공학"], note: "HL만도 & 클레무브 IVS 스쿨 5기 수료, 창의문제해결프로젝트 최우수상", p: "청라", pk: ["청라"], lat: 37.5345, lon: 126.6500, lv: "a", r: "인천", age: "26", hob: ["탁구", "독서", "게임", "뮤지컬관람"], now: "사람들 학과랑 프로젝트 경험 수집하고 싶은데 모을 방법이 없음", recent: "자기소개서 쓰기", guess: "몰루", gift: "먹을 것" },
+    { n: "박소영", y: 2000, g: "W", maj: ["시스템반도체"], role: "CA", p: "동탄", pk: ["동탄"], lat: 37.2000, lon: 127.0960, lv: "a", r: "경기", age: "26", hob: ["가챠깡", "요즘 밈 습득하기"], now: "민지님께 장고 1:1 과외받기", recent: "int형 시험보고 그거 땜에 방 치움", guess: "비밀", gift: "먹을거" },
+    { n: "정소연", y: 2001, g: "W", maj: ["산업경영공학"], p: "낙성대", pk: ["낙성대"], lat: 37.4770, lon: 126.9636, lv: "s", r: "서울", age: "26", hob: ["뜨개", "닌텐도"], now: "RAG 프로젝트", recent: "어제 저녁으로 지삼선, 홍소육 먹음", guess: "비밀", gift: "마니또가 좋아하는 간식들" },
+    { n: "김민한", y: 1997, g: "M", maj: ["안경광학"], p: "고척동", pk: ["고척"], lat: 37.5010, lon: 126.8660, lv: "s", r: "서울", age: "30", hob: ["클라이밍"], now: "AI 관련 지식 배우기", recent: "AI 공부", guess: "(웃음으로 대신함)", gift: "꽈자" },
+    { n: "이승진", y: 1998, g: "W", maj: ["차이나데이터큐레이션", "광고.PR.브랜딩"], role: "반장", p: "부천시청", pk: ["부천"], lat: 37.5049, lon: 126.7634, lv: "s", r: "경기", age: "29", hob: ["공연 관람"], now: "RAG DB 어떻게 모을지 고민하기", recent: "", guess: "방호준", gift: "간식과 메모" },
+    { n: "류선우", y: 2002, g: "W", maj: ["응용통계학"], p: "구디역", pk: ["구디", "구로디지털"], lat: 37.4852, lon: 126.9015, lv: "s", r: "서울", age: "25", hob: [], now: "잠온다", recent: "KFC 치킨 먹음", guess: "양떼목장", gift: "그 사람이 좋아하는 것" },
+    { n: "최장현", y: 1999, g: "M", maj: ["국제정치"], p: "남성역", pk: ["남성역"], lat: 37.4846, lon: 126.9712, lv: "s", r: "서울", age: "28", hob: ["운동", "영화", "여행"], now: "멍 때리기", recent: "똘이 산책", guess: "모르겄음. 남자일거 같음", gift: "과자" },
+    { n: "이재원", y: 1997, g: "M", maj: ["철학"], mbti: "ISTP", p: "창동", pk: ["창동"], lat: 37.6534, lon: 127.0477, lv: "s", r: "서울", age: "30", hob: ["게임", "타로", "코노"], now: "DB 생성 고민 중", recent: "몬스터 마시기", guess: "예측하기 어렵지만 박재윤", gift: "맛있는 거", msg: "안심 배달 서비스 만족도 별 5개" },
+    { n: "방호준", y: 1998, g: "M", maj: ["신소재공학"], p: "종로", pk: ["종로"], lat: 37.5704, lon: 126.9921, lv: "a", r: "서울", age: "", hob: [], now: "", recent: "", guess: "", gift: "" },
+    { n: "정민지", y: 1998, g: "W", maj: ["도시공학"], note: "대학 독서골든벨 금상 수상, 삼국지 애독자", p: "회기역", pk: ["회기"], lat: 37.5894, lon: 127.0575, lv: "s", r: "서울", age: "29", hob: ["잠자기"], now: "ADSP, 투운사, SQLD 미루기", recent: "주식 사고 올라서 좋아하다 바로 마이너스 맞기", guess: "재준소영주영아영승진선우장현승우 빼고 모두를 의심 중 (1/14의 확률)", gift: "내가 좋아하는 거", msg: "진짜 너무 고맙고 후 나랑 맛있는 거 먹으러 가자ㅏㅏ 언니가 사줄게" },
+    { n: "박재윤", y: 1998, g: "M", maj: ["전자공학"], p: "당정역", pk: ["당정"], lat: 37.3434, lon: 126.9482, lv: "s", r: "경기", age: "29", hob: ["게임", "영화 관람"], now: "알고리즘", recent: "형찬님과 운동", guess: "비밀", gift: "마실 것" },
+    { n: "김민수", y: 1998, g: "M", maj: ["기계공학"], p: "동탄", pk: ["동탄"], lat: 37.2000, lon: 127.0960, lv: "a", r: "경기", age: "29", hob: ["베이스 연주", "영화관람"], now: "알고리즘", recent: "초코파이 먹기", guess: "젤리에서 스티커 나왔는데 누군지 알아내면 돌려드릴게요", gift: "먹을거" },
+    { n: "박현모", y: 2001, g: "M", maj: ["게임기획"], p: "낙성대", pk: ["낙성대"], lat: 37.4770, lon: 126.9636, lv: "s", r: "서울", age: "26", hob: ["농구", "풋살"], now: "큰일났다 진짜 쟝고 드럽게 어렵다", recent: "집에 활새우 택배로 배달시켜서 먹기", guess: "진짜 당신 누군데", gift: "많은 것" },
+    { n: "이재준", y: 1998, g: "M", maj: ["영어교육"], mbti: "ENFP", p: "양천구청", pk: ["양천"], lat: 37.5169, lon: 126.8664, lv: "s", r: "서울", age: "29", hob: ["게임", "코노", "운동"], now: "자룡센세의 애착인형", recent: "자룡센세에게 맞기", guess: "흐으으으음 나랑 산책을 같이 가 본 사람?", gift: "맛있는 거" },
+    { n: "조유현", y: 1997, g: "W", maj: ["영어영문학"], p: "용인 처인구", pk: ["용인", "처인"], lat: 37.2343, lon: 127.2010, lv: "a", r: "경기", age: "29 (internationally)", hob: ["요가"], now: "기획중", recent: "기획", guess: "솔직히 모르겠음", gift: "먹을 것" }
+  ];
+
+  /* 전공 → 계열 (클래식 비교·시너지용) */
+  var FIELD = {
+    "융복합소프트웨어": "공학", "건설시스템공학": "공학", "신소재공학": "공학", "전기전자공학": "공학", "시스템반도체": "공학",
+    "산업경영공학": "공학", "도시공학": "공학", "전자공학": "공학", "기계공학": "공학",
+    "스페인어": "인문", "국어국문학": "인문", "영어영문학": "인문", "철학": "인문", "차이나데이터큐레이션": "인문",
+    "경영학": "사회·상경", "경제학": "사회·상경", "국제경영": "사회·상경", "언론정보": "사회·상경", "국제정치": "사회·상경", "광고.PR.브랜딩": "사회·상경",
+    "금융수학": "자연", "응용통계학": "자연", "안경광학": "보건", "영어교육": "교육", "게임기획": "콘텐츠"
+  };
+  var FIELDS = ["공학", "인문", "사회·상경", "자연", "보건", "교육", "콘텐츠"];
+
+  var S = [
+    ["시청", 37.5658, 126.9773, 1], ["을지로입구", 37.5660, 126.9822, 0], ["을지로3가", 37.5663, 126.9917, 0],
+    ["을지로4가", 37.5667, 126.9978, 0], ["동대문역사문화공원", 37.5651, 127.0079, 0], ["신당", 37.5659, 127.0200, 0],
+    ["상왕십리", 37.5644, 127.0292, 0], ["왕십리", 37.5612, 127.0371, 2], ["한양대", 37.5555, 127.0437, 0],
+    ["뚝섬", 37.5472, 127.0472, 0], ["성수", 37.5446, 127.0560, 0], ["건대입구", 37.5404, 127.0702, 2],
+    ["구의", 37.5372, 127.0858, 0], ["강변", 37.5352, 127.0946, 0], ["잠실나루", 37.5207, 127.1037, 0],
+    ["잠실", 37.5133, 127.1001, 1], ["잠실새내", 37.5115, 127.0861, 0], ["종합운동장", 37.5110, 127.0736, 0],
+    ["삼성", 37.5088, 127.0631, 0], ["선릉", 37.5045, 127.0490, 2], ["역삼", 37.5007, 127.0366, 0],
+    ["강남", 37.4979, 127.0276, 2], ["교대", 37.4934, 127.0140, 0], ["서초", 37.4918, 127.0077, 0],
+    ["방배", 37.4813, 126.9976, 0], ["사당", 37.4765, 126.9816, 2], ["낙성대", 37.4770, 126.9636, 0],
+    ["서울대입구", 37.4812, 126.9527, 0], ["봉천", 37.4825, 126.9418, 0], ["신림", 37.4842, 126.9296, 0],
+    ["신대방", 37.4875, 126.9131, 0], ["구로디지털단지", 37.4852, 126.9015, 0], ["대림", 37.4925, 126.8957, 0],
+    ["신도림", 37.5088, 126.8913, 2], ["문래", 37.5179, 126.8947, 0], ["영등포구청", 37.5249, 126.8967, 0],
+    ["당산", 37.5343, 126.9025, 0], ["합정", 37.5495, 126.9139, 0], ["홍대입구", 37.5568, 126.9244, 2],
+    ["신촌", 37.5551, 126.9366, 0], ["이대", 37.5568, 126.9460, 0], ["아현", 37.5574, 126.9561, 0],
+    ["충정로", 37.5598, 126.9637, 0]
+  ];
+
+  /* ================= 유틸 ================= */
+  function $(id) {
+    return document.getElementById(id);
+  }
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+    });
+  }
+  function rand(a) {
+    return a[Math.floor(Math.random() * a.length)];
+  }
+  function shuffle(arr) {
+    var a = arr.slice();
+    var i;
+    for (i = a.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = a[i];
+      a[i] = a[j];
+      a[j] = t;
+    }
+    return a;
+  }
+  function sample(a, n) {
+    return shuffle(a).slice(0, n);
+  }
+  function uniq(a) {
+    var seen = {};
+    return a.filter(function (x) {
+      if (seen[x]) {
+        return false;
+      }
+      seen[x] = 1;
+      return true;
+    });
+  }
+  function km(a1, o1, a2, o2) {
+    var k = Math.PI / 180;
+    var dA = (a2 - a1) * k;
+    var dO = (o2 - o1) * k;
+    var h = Math.sin(dA / 2) * Math.sin(dA / 2) + Math.cos(a1 * k) * Math.cos(a2 * k) * Math.sin(dO / 2) * Math.sin(dO / 2);
+    return 2 * 6371 * Math.asin(Math.sqrt(h));
+  }
+  function fkm(x) {
+    return x.toFixed(1) + " km";
+  }
+  function gko(g) {
+    return g === "M" ? "남" : "여";
+  }
+  function hash(s) {
+    var h = 2166136261;
+    var i;
+    for (i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+  }
+  function mulberry(a) {
+    return function () {
+      a |= 0;
+      a = a + 0x6D2B79F5 | 0;
+      var t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  function canonHobby(h) {
+    var k = h.replace(/\s+/g, "");
+    if (k.indexOf("영화") >= 0) {
+      return "영화";
+    }
+    if (k === "코노" || k === "코인노래방") {
+      return "코인노래방";
+    }
+    if (k === "책읽기" || k === "독서") {
+      return "독서";
+    }
+    if (k === "노래듣기" || k === "음악감상") {
+      return "음악감상";
+    }
+    if (k.indexOf("가챠") === 0) {
+      return "가챠";
+    }
+    return k;
+  }
+  var HLABEL = { "영화": "영화", "코인노래방": "코인노래방", "독서": "독서", "음악감상": "음악 감상", "가챠": "가챠" };
+
+  /* 파생 값 */
+  var GN_COUNT = {};
+  M.forEach(function (d, i) {
+    d.i = i;
+    d.gn = d.n.slice(1);
+    GN_COUNT[d.gn] = (GN_COUNT[d.gn] || 0) + 1;
+    d.k = km(d.lat, d.lon, CAMPUS.lat, CAMPUS.lon);
+    d.lvl = YEAR - d.y + 1;
+    d.fields = uniq(d.maj.map(function (m) { return FIELD[m]; }));
+    d.hc = uniq(d.hob.map(canonHobby));
+    d.hue = hash(d.n) % 360;
+    d.title = d.nick || d.now || "소개글 미작성";
+    d.intro = !!d.age;
+  });
+
+  function pt(d, extra) {
+    return '<span class="pt ' + (extra || "") + '" style="--h:' + d.hue + '" aria-hidden="true"><span>' + esc(d.gn) + "</span></span>";
+  }
+
+
+  var NOT_Q = { "비밀": 1, "모르겠음": 1, "몰루": 1, "솔직히 모르겠음": 1, "": 1 };
+  var HOWN = (function () {
+    var map = {};
+    M.forEach(function (d) {
+      d.hob.forEach(function (h) {
+        var c = canonHobby(h);
+        if (!map[c]) {
+          map[c] = { o: [], label: HLABEL[c] || h };
+        }
+        if (map[c].o.indexOf(d.i) < 0) {
+          map[c].o.push(d.i);
+        }
+      });
+    });
+    return map;
+  })();
+
+  /* ================= 챗봇 ================= */
+  function docText(d) {
+    var t = d.n + "은(는) " + d.y + "년생 " + (d.g === "M" ? "남성" : "여성") + "이며 전공은 " + d.maj.join("과 ") + "(" + d.fields.join(", ") + " 계열)입니다. ";
+    t += "거주 지역은 " + d.p + "(" + d.r + ")이고 역삼까지 약 " + fkm(d.k) + "입니다. ";
+    if (d.hob.length) {
+      t += "취미는 " + d.hob.join(", ") + "입니다. ";
+    }
+    if (d.now) {
+      t += "요즘 상태는 '" + d.now + "'입니다. ";
+    }
+    if (d.recent) {
+      t += "최근 한 일은 '" + d.recent + "'입니다. ";
+    }
+    if (d.mbti) {
+      t += "MBTI는 " + d.mbti + "입니다. ";
+    }
+    if (d.note) {
+      t += d.note + ". ";
+    }
+    if (d.role) {
+      t += "반의 " + d.role + "입니다. ";
+    }
+    if (d.guess) {
+      t += "마니또 추측은 '" + d.guess + "'입니다. ";
+    }
+    if (d.gift) {
+      t += "마니또에게 준 것은 '" + d.gift + "'입니다. ";
+    }
+    if (d.msg) {
+      t += "마니또에게 한마디: '" + d.msg + "'. ";
+    }
+    if (!d.intro) {
+      t += "소개글은 아직 작성하지 않았습니다.";
+    }
+    return t.trim();
+  }
+  var DOCS = [{ id: "class", title: "반 정보", text: "SSAFY " + CLS.cohort + " 서울 7반은 " + CLS.campus + " " + CLS.track + " 트랙입니다. 담임은 " + CLS.teacher + ", 담당 프로는 " + CLS.pro + ", 반장은 " + CLS.leader + ", CA는 " + CLS.ca + "입니다. 총원 " + CLS.total + "명, 취업자 " + CLS.employed + "명입니다. 교실은 " + CLS.room + "이고 식당은 " + CLS.food + "입니다. 지금 하는 일은 " + CLS.doing + "입니다." }]
+    .concat(M.map(function (d) { return { id: "m" + d.i, title: d.n, mi: d.i, text: docText(d) }; }));
+  function grams(s) {
+    var out = [];
+    s.toLowerCase().replace(/[^0-9a-z가-힣]+/g, " ").split(" ").forEach(function (w) {
+      var i;
+      if (!w) {
+        return;
+      }
+      if (w.length === 1) {
+        out.push(w);
+      }
+      for (i = 0; i < w.length - 1; i++) {
+        out.push(w.substr(i, 2));
+      }
+    });
+    return out;
+  }
+  var DF = {};
+  DOCS.forEach(function (doc) {
+    doc.tf = {};
+    var g = grams(doc.text + " " + doc.title);
+    g.forEach(function (x) { doc.tf[x] = (doc.tf[x] || 0) + 1; });
+    doc.len = Math.sqrt(g.length);
+    Object.keys(doc.tf).forEach(function (x) { DF[x] = (DF[x] || 0) + 1; });
+  });
+  function retrieve(q, n) {
+    var g = uniq(grams(q));
+    return DOCS.map(function (doc) {
+      var s = 0;
+      g.forEach(function (x) {
+        if (doc.tf[x]) {
+          s += doc.tf[x] * Math.log(1 + DOCS.length / DF[x]);
+        }
+      });
+      return { doc: doc, s: s / doc.len };
+    }).filter(function (r) { return r.s > 0; }).sort(function (a, b) { return b.s - a.s; }).slice(0, n || 3);
+  }
+
+  var MAJ_SYN = {
+    "소프트웨어": ["융복합소프트웨어"], "컴퓨터": ["융복합소프트웨어"], "반도체": ["시스템반도체"], "통계": ["응용통계학"],
+    "전자": ["전자공학", "전기전자공학"], "전기": ["전기전자공학"], "경영": ["경영학", "국제경영", "산업경영공학"], "경제": ["경제학"],
+    "수학": ["금융수학"], "금융": ["금융수학"], "영어": ["영어영문학", "영어교육"], "영문": ["영어영문학"], "국문": ["국어국문학"], "국어": ["국어국문학"],
+    "스페인": ["스페인어"], "중국": ["차이나데이터큐레이션"], "차이나": ["차이나데이터큐레이션"], "광고": ["광고.PR.브랜딩"], "브랜딩": ["광고.PR.브랜딩"],
+    "신소재": ["신소재공학"], "기계": ["기계공학"], "건설": ["건설시스템공학"], "도시": ["도시공학"], "산업": ["산업경영공학"], "안경": ["안경광학"],
+    "철학": ["철학"], "정치": ["국제정치"], "언론": ["언론정보"], "게임기획": ["게임기획"], "교육": ["영어교육"], "융복합": ["융복합소프트웨어"]
+  };
+  var FIELD_SYN = { "공대": "공학", "공학": "공학", "이공": "공학", "인문": "인문", "문과": "인문", "상경": "사회·상경", "사회": "사회·상경", "자연": "자연", "보건": "보건", "콘텐츠": "콘텐츠" };
+  var HOB_SYN = [["코노", "코인노래방"], ["노래방", "코인노래방"], ["게임", "게임"], ["영화", "영화"], ["농구", "농구"], ["운동", "운동"], ["여행", "여행"], ["독서", "독서"], ["책", "독서"],
+    ["음악", "음악감상"], ["노래", "음악감상"], ["사진", "사진"], ["테니스", "테니스"], ["클라이밍", "클라이밍"], ["요가", "요가"], ["뜨개", "뜨개"], ["닌텐도", "닌텐도"],
+    ["탁구", "탁구"], ["풋살", "풋살"], ["드럼", "드럼연주"], ["베이스", "베이스연주"], ["타로", "타로"], ["카페", "카페투어"], ["공연", "공연관람"], ["뮤지컬", "뮤지컬관람"],
+    ["잠자", "잠자기"], ["가챠", "가챠"], ["밈", "요즘밈습득하기"]];
+
+  function listNames(arr) {
+    return arr.map(function (d) { return d.n; }).join(", ");
+  }
+  function findPersons(q) {
+    var found = [];
+    var rest = q;
+    M.forEach(function (d) {
+      if (rest.indexOf(d.n) >= 0) {
+        found.push(d);
+        rest = rest.split(d.n).join(" ");
+      }
+    });
+    var amb = null;
+    Object.keys(GN_COUNT).forEach(function (gn) {
+      if (rest.indexOf(gn) < 0) {
+        return;
+      }
+      var who = M.filter(function (d) { return d.gn === gn; });
+      if (who.length > 1) {
+        amb = who;
+      } else if (found.indexOf(who[0]) < 0) {
+        found.push(who[0]);
+      }
+    });
+    return { list: found, amb: amb };
+  }
+  var RX = {
+    res: /(어디\s*살|사는\s*곳|사는곳|거주|동네|집이|집은|어디\s*사|살아|사세요|살고)/,
+    maj: /(전공|학과|무슨\s*과|과가|과는|계열)/,
+    hob: /(취미|좋아하는|뭐\s*좋아|즐기)/,
+    age: /(나이|몇\s*살|살이야|년생|생년|출생|몇\s*년)/,
+    now: /(요즘|현재|근황|상태)/,
+    recent: /(최근|요새\s*뭐)/,
+    guess: /(추측)/,
+    gift: /(선물|준\s*것|줬|준거)/,
+    msg: /(한마디|하고\s*싶은\s*말)/,
+    mbti: /mbti/i,
+    dist: /(거리|멀어|멀리|먼|가까|통학|몇\s*km)/,
+    gender: /(성별)/,
+    note: /(수상|업적|팬이|특이|자랑)/
+  };
+  function personAnswer(d, q) {
+    var out = [];
+    var hit = false;
+    if (RX.res.test(q)) {
+      out.push(d.n + "님은 " + d.p + "(" + d.r + ")에 삽니다. 역삼 멀티캠퍼스까지 직선으로 약 " + fkm(d.k) + "입니다.");
+      hit = true;
+    }
+    if (RX.maj.test(q)) {
+      out.push(d.n + "님의 전공은 " + d.maj.join(", ") + "이고, " + d.fields.join("·") + " 계열입니다.");
+      hit = true;
+    }
+    if (RX.hob.test(q)) {
+      out.push(d.hob.length ? d.n + "님의 취미는 " + d.hob.join(", ") + "입니다." : (d.intro ? d.n + "님은 취미를 '없음'이라고 적었습니다." : d.n + "님은 소개글이 없어 취미 정보가 없습니다."));
+      hit = true;
+    }
+    if (RX.age.test(q)) {
+      out.push(d.n + "님은 " + d.y + "년생으로 2026년 기준 " + d.lvl + "세(한국 나이)입니다." + (d.age ? " 소개글에는 나이를 '" + d.age + "'(으)로 적었습니다." : ""));
+      hit = true;
+    }
+    if (RX.now.test(q)) {
+      out.push(d.now ? d.n + "님의 요즘 상태: \"" + d.now + "\"" : d.n + "님은 요즘 상태를 적지 않았습니다.");
+      hit = true;
+    }
+    if (RX.recent.test(q)) {
+      out.push(d.recent ? d.n + "님이 최근 한 일: \"" + d.recent + "\"" : d.n + "님은 최근 한 일을 적지 않았습니다.");
+      hit = true;
+    }
+    if (RX.guess.test(q) || (/마니또/.test(q) && !RX.gift.test(q) && !RX.msg.test(q))) {
+      out.push(d.guess ? d.n + "님의 마니또 추측: \"" + d.guess + "\"" : d.n + "님은 마니또 추측을 적지 않았습니다.");
+      hit = true;
+    }
+    if (RX.gift.test(q)) {
+      out.push(d.gift ? d.n + "님이 마니또에게 준 것: " + d.gift : d.n + "님은 준 선물을 적지 않았습니다.");
+      hit = true;
+    }
+    if (RX.msg.test(q)) {
+      out.push(d.msg ? d.n + "님이 마니또에게 남긴 말: \"" + d.msg + "\"" : d.n + "님은 마니또에게 한마디를 남기지 않았습니다.");
+      hit = true;
+    }
+    if (RX.mbti.test(q)) {
+      out.push(d.mbti ? d.n + "님의 MBTI는 " + d.mbti + "입니다." : d.n + "님은 MBTI를 공개하지 않았습니다.");
+      hit = true;
+    }
+    if (RX.dist.test(q) && !RX.res.test(q)) {
+      out.push(d.n + "님 집(" + d.p + ")에서 역삼까지 직선 약 " + fkm(d.k) + "입니다. 23명 중 " + (M.slice().sort(function (a, b) { return a.k - b.k; }).indexOf(d) + 1) + "번째로 가깝습니다.");
+      hit = true;
+    }
+    if (RX.gender.test(q)) {
+      out.push(d.n + "님은 " + (d.g === "M" ? "남성" : "여성") + "입니다.");
+      hit = true;
+    }
+    if (RX.note.test(q)) {
+      out.push(d.note ? d.n + "님 특이사항: " + d.note : d.n + "님은 따로 적은 특이사항이 없습니다.");
+      hit = true;
+    }
+    if (!hit) {
+      var lines = [d.n + " · " + d.y + "년생 " + gko(d.g) + (d.role ? " · " + d.role : "")];
+      lines.push("전공: " + d.maj.join(", ") + " (" + d.fields.join("·") + ")");
+      lines.push("사는 곳: " + d.p + " · 역삼까지 " + fkm(d.k));
+      if (d.hob.length) {
+        lines.push("취미: " + d.hob.join(", "));
+      }
+      if (d.now) {
+        lines.push("요즘: " + d.now);
+      }
+      if (d.recent) {
+        lines.push("최근 한 일: " + d.recent);
+      }
+      if (d.mbti) {
+        lines.push("MBTI: " + d.mbti);
+      }
+      if (d.note) {
+        lines.push("특이사항: " + d.note);
+      }
+      if (d.guess) {
+        lines.push("마니또 추측: " + d.guess);
+      }
+      if (d.gift) {
+        lines.push("마니또에게 준 것: " + d.gift);
+      }
+      if (!d.intro) {
+        lines.push("소개글은 아직 없습니다.");
+      }
+      out.push(lines.join("\n"));
+    }
+    return out.join("\n");
+  }
+  function answer(raw) {
+    var q = raw.trim();
+    var ql = q.toLowerCase();
+    var P = findPersons(q);
+    if (P.amb && !P.list.length) {
+      return { text: "'" + P.amb[0].gn + "'(이)라는 이름이 " + listNames(P.amb) + " 두 명입니다. 성까지 붙여서 다시 물어봐 주세요.", refs: P.amb.map(function (d) { return d.i; }) };
+    }
+    if (P.list.length === 2 && /(누가|중|둘|더)/.test(q)) {
+      var a = P.list[0];
+      var b = P.list[1];
+      if (/(나이|먼저|형|누나|언니|오빠|어려|많|연장)/.test(q)) {
+        if (a.y === b.y) {
+          return { text: a.n + "님과 " + b.n + "님은 둘 다 " + a.y + "년생 동갑입니다.", refs: [a.i, b.i] };
+        }
+        var older = a.y < b.y ? a : b;
+        var younger = older === a ? b : a;
+        return { text: older.n + "님(" + older.y + "년생)이 " + younger.n + "님(" + younger.y + "년생)보다 먼저 태어났습니다.", refs: [a.i, b.i] };
+      }
+      if (RX.dist.test(q) || /멀|먼|가까/.test(q)) {
+        var far = a.k > b.k ? a : b;
+        var near = far === a ? b : a;
+        return { text: far.n + "님(" + far.p + ", " + fkm(far.k) + ")이 " + near.n + "님(" + near.p + ", " + fkm(near.k) + ")보다 역삼에서 더 멉니다.", refs: [a.i, b.i] };
+      }
+      var shared = a.hc.filter(function (h) { return b.hc.indexOf(h) >= 0; });
+      if (/(공통|같이|겹치|비슷)/.test(q)) {
+        var t = [];
+        t.push(shared.length ? "공통 취미: " + shared.map(function (h) { return HLABEL[h] || h; }).join(", ") : "공통 취미는 없습니다.");
+        t.push(a.p === b.p ? "같은 동네(" + a.p + ")에 삽니다." : "사는 곳: " + a.n + " " + a.p + " / " + b.n + " " + b.p);
+        t.push(a.y === b.y ? "동갑(" + a.y + "년생)입니다." : "출생: " + a.n + " " + a.y + " / " + b.n + " " + b.y);
+        var cf = a.fields.filter(function (f) { return b.fields.indexOf(f) >= 0; });
+        t.push(cf.length ? "같은 " + cf.join("·") + " 계열입니다." : "전공 계열은 다릅니다.");
+        return { text: a.n + "님과 " + b.n + "님 비교\n" + t.join("\n"), refs: [a.i, b.i] };
+      }
+    }
+    if (P.list.length === 1 && /(추측한|지목|의심한|마니또로 생각)/.test(q)) {
+      var d0 = P.list[0];
+      var gs = M.filter(function (x) { return x.guess && x.guess.indexOf(d0.n) >= 0; });
+      return { text: gs.length ? d0.n + "님을 마니또로 추측한 사람: " + gs.map(function (x) { return x.n + "(\"" + x.guess + "\")"; }).join(", ") : d0.n + "님의 이름을 마니또 추측에 적은 사람은 없습니다.", refs: [d0.i].concat(gs.map(function (x) { return x.i; })) };
+    }
+    if (P.list.length >= 1) {
+      return { text: P.list.map(function (d) { return personAnswer(d, q); }).join("\n\n"), refs: P.list.map(function (d) { return d.i; }) };
+    }
+
+    /* 사람 이름이 없는 질문 */
+    if (/(반장)/.test(q)) {
+      return { text: "반장은 " + CLS.leader + "님입니다.", refs: [M.filter(function (d) { return d.n === CLS.leader; })[0].i] };
+    }
+    if (/(ca|씨에이)/i.test(q)) {
+      return { text: "CA는 " + CLS.ca + "님입니다.", refs: [M.filter(function (d) { return d.n === CLS.ca; })[0].i] };
+    }
+    if (/담임|선생님|자룡/.test(q)) {
+      return { text: "담임은 " + CLS.teacher + "님입니다.", refs: [] };
+    }
+    if (/(담당\s*프로|프로님|민희)/.test(q)) {
+      return { text: "담당 프로는 " + CLS.pro + "님입니다.", refs: [] };
+    }
+    if (/(교실|강의실|몇\s*호|위치|어디야|어디에\s*있)/.test(q) && !/살/.test(q)) {
+      return { text: "교실은 " + CLS.room + "입니다.", refs: [] };
+    }
+    if (/(식당|밥|점심|저녁\s*먹)/.test(q)) {
+      return { text: "식당은 " + CLS.food + "입니다.", refs: [] };
+    }
+    if (/(취업)/.test(q)) {
+      return { text: "현재 취업자는 " + CLS.employed + "명 / 총원 " + CLS.total + "명입니다.", refs: [] };
+    }
+    if (/(뭐\s*배우|진도|하는\s*일|지금\s*뭐)/.test(q)) {
+      return { text: "지금 7반은 " + CLS.doing + " 중입니다.", refs: [] };
+    }
+    if (/(트랙|기수|몇\s*기)/.test(q)) {
+      return { text: "SSAFY " + CLS.cohort + " 서울 7반, " + CLS.track + " 트랙입니다.", refs: [] };
+    }
+    var ym = q.match(/(\d{2,4})\s*년생/);
+    if (ym) {
+      var yy = Number(ym[1]);
+      if (yy < 100) {
+        yy += yy > 50 ? 1900 : 2000;
+      }
+      var yl = M.filter(function (d) { return d.y === yy; });
+      return { text: yl.length ? yy + "년생은 " + yl.length + "명입니다: " + listNames(yl) : yy + "년생은 없습니다.", refs: yl.map(function (d) { return d.i; }) };
+    }
+    var am = q.match(/(\d{2})\s*살/);
+    if (am) {
+      var ay = YEAR - Number(am[1]) + 1;
+      var al = M.filter(function (d) { return d.y === ay; });
+      return { text: al.length ? am[1] + "살(" + ay + "년생, 한국 나이)은 " + listNames(al) + "입니다." : am[1] + "살(" + ay + "년생)은 없습니다.", refs: al.map(function (d) { return d.i; }) };
+    }
+    if (/(가장|제일|젤|누가\s*제일)/.test(q)) {
+      var s1 = M.slice().sort(function (a2, b2) { return a2.k - b2.k; });
+      if (/멀|먼/.test(q)) {
+        var mk = s1[s1.length - 1].k;
+        var fl = s1.filter(function (d) { return mk - d.k < 0.05; });
+        return { text: "역삼에서 가장 먼 사람은 " + listNames(fl) + "(" + fl[0].p + ", 약 " + fkm(mk) + ")입니다.", refs: fl.map(function (d) { return d.i; }) };
+      }
+      if (/가까/.test(q)) {
+        return { text: "역삼에서 가장 가까운 사람은 " + s1[0].n + "(" + s1[0].p + ", 약 " + fkm(s1[0].k) + ")입니다.", refs: [s1[0].i] };
+      }
+      if (/(나이\s*많|맏|형|누나|연장|나이가\s*많|늙)/.test(q)) {
+        var my = Math.min.apply(null, M.map(function (d) { return d.y; }));
+        var ol = M.filter(function (d) { return d.y === my; });
+        return { text: "가장 나이가 많은 사람은 " + my + "년생 " + listNames(ol) + "입니다.", refs: ol.map(function (d) { return d.i; }) };
+      }
+      if (/(어린|막내|젊|나이\s*적)/.test(q)) {
+        var xy = Math.max.apply(null, M.map(function (d) { return d.y; }));
+        var yl2 = M.filter(function (d) { return d.y === xy; });
+        return { text: "막내는 " + xy + "년생 " + listNames(yl2) + "입니다.", refs: yl2.map(function (d) { return d.i; }) };
+      }
+      if (/취미/.test(q)) {
+        var hk = Object.keys(HOWN).sort(function (a3, b3) { return HOWN[b3].o.length - HOWN[a3].o.length; })[0];
+        return { text: "가장 많은 사람이 가진 취미는 '" + HOWN[hk].label + "'(" + HOWN[hk].o.length + "명: " + HOWN[hk].o.map(function (i) { return M[i].n; }).join(", ") + ")입니다.", refs: HOWN[hk].o };
+      }
+    }
+    if (/막내/.test(q)) {
+      return answer("가장 어린 사람");
+    }
+    if (/(같은\s*동네|이웃|같이\s*사는)/.test(q)) {
+      var pg = {};
+      M.forEach(function (d) {
+        if (!pg[d.p]) {
+          pg[d.p] = [];
+        }
+        pg[d.p].push(d);
+      });
+      var ks = Object.keys(pg).filter(function (k) { return pg[k].length > 1; });
+      return { text: "같은 동네에 사는 사람들\n" + ks.map(function (k) { return k + ": " + listNames(pg[k]); }).join("\n"), refs: [].concat.apply([], ks.map(function (k) { return pg[k].map(function (d) { return d.i; }); })) };
+    }
+    if (/mbti/i.test(q)) {
+      var mb = M.filter(function (d) { return d.mbti; });
+      return { text: "MBTI를 공개한 사람은 " + mb.map(function (d) { return d.n + "(" + d.mbti + ")"; }).join(", ") + "입니다.", refs: mb.map(function (d) { return d.i; }) };
+    }
+    if (/(남자|남성|여자|여성)/.test(q) && /(몇|수|인원)/.test(q)) {
+      var mn = M.filter(function (d) { return d.g === "M"; });
+      return { text: "남성 " + mn.length + "명, 여성 " + (M.length - mn.length) + "명입니다.", refs: [] };
+    }
+    if (/(몇\s*명|인원|총원)/.test(q) && !/(취미|년생|사는|살)/.test(q)) {
+      var rc = { "서울": 0, "경기": 0, "인천": 0 };
+      M.forEach(function (d) { rc[d.r] += 1; });
+      return { text: "총원은 " + CLS.total + "명입니다. 서울 " + rc["서울"] + "명, 경기 " + rc["경기"] + "명, 인천 " + rc["인천"] + "명이 다닙니다.", refs: [] };
+    }
+    /* 동네 */
+    var byPlace = M.filter(function (d) { return d.pk.some(function (k) { return q.indexOf(k) >= 0; }); });
+    if (byPlace.length) {
+      var places = uniq(byPlace.map(function (d) { return d.p; }));
+      return { text: places.map(function (p) { var l = byPlace.filter(function (d) { return d.p === p; }); return p + "에 사는 사람: " + listNames(l); }).join("\n"), refs: byPlace.map(function (d) { return d.i; }) };
+    }
+    if (/2호선/.test(q)) {
+      var l2 = M.filter(function (d) { return ["신림", "서울대입구", "낙성대", "구디역"].indexOf(d.p) >= 0; });
+      return { text: "2호선 역 근처에 사는 사람: " + l2.map(function (d) { return d.n + "(" + d.p + ")"; }).join(", "), refs: l2.map(function (d) { return d.i; }) };
+    }
+    var regs = ["경기", "인천", "서울"].filter(function (r) { return q.indexOf(r) >= 0; });
+    if (regs.length && /(살|사는|거주|출신|통학|다니)/.test(q)) {
+      var rl = M.filter(function (d) { return regs.indexOf(d.r) >= 0; });
+      return { text: regs.join("·") + "에서 다니는 사람(" + rl.length + "명): " + rl.map(function (d) { return d.n + "(" + d.p + ")"; }).join(", "), refs: rl.map(function (d) { return d.i; }) };
+    }
+    /* 전공 */
+    var majHits = [];
+    Object.keys(MAJ_SYN).forEach(function (k) {
+      if (q.indexOf(k) >= 0) {
+        majHits = majHits.concat(MAJ_SYN[k]);
+      }
+    });
+    M.forEach(function (d) {
+      d.maj.forEach(function (m) {
+        if (q.indexOf(m) >= 0) {
+          majHits.push(m);
+        }
+      });
+    });
+    majHits = uniq(majHits);
+    if (majHits.length && !/(취미)/.test(q)) {
+      var ml = M.filter(function (d) { return d.maj.some(function (m) { return majHits.indexOf(m) >= 0; }); });
+      return { text: majHits.join(", ") + " 전공자: " + ml.map(function (d) { return d.n + "(" + d.maj.join("/") + ")"; }).join(", "), refs: ml.map(function (d) { return d.i; }) };
+    }
+    var fHit = Object.keys(FIELD_SYN).filter(function (k) { return q.indexOf(k) >= 0; }).map(function (k) { return FIELD_SYN[k]; });
+    if (fHit.length) {
+      var fl2 = M.filter(function (d) { return d.fields.indexOf(fHit[0]) >= 0; });
+      return { text: fHit[0] + " 계열(" + fl2.length + "명): " + fl2.map(function (d) { return d.n + "(" + d.maj.join("/") + ")"; }).join(", "), refs: fl2.map(function (d) { return d.i; }) };
+    }
+    /* 취미 */
+    var hHit = null;
+    HOB_SYN.some(function (p) {
+      if (q.indexOf(p[0]) >= 0) {
+        hHit = p[1];
+        return true;
+      }
+      return false;
+    });
+    if (hHit) {
+      var hl = M.filter(function (d) { return d.hc.indexOf(hHit) >= 0; });
+      return { text: hl.length ? "'" + (HLABEL[hHit] || hHit) + "'을(를) 취미로 적은 사람: " + hl.map(function (d) { return d.n; }).join(", ") : "그 취미를 적은 사람은 없습니다.", refs: hl.map(function (d) { return d.i; }) };
+    }
+    if (/마니또/.test(q)) {
+      var gl = M.filter(function (d) { return d.guess && !NOT_Q[d.guess] && d.guess.charAt(0) !== "("; });
+      return { text: "마니또 추측 모음\n" + gl.map(function (d) { return d.n + ": " + d.guess; }).join("\n"), refs: gl.map(function (d) { return d.i; }) };
+    }
+    if (/(뭐|무엇).*(물어|질문|할\s*수)|도움말|help/i.test(q)) {
+      return { text: "이런 걸 물어볼 수 있습니다.\n· 사람별: 사는 곳, 전공, 취미, 나이, 요즘 상태, 최근 한 일, MBTI, 마니또 추측·선물\n· 목록: 동네/지역별, 전공·계열별, 취미별, 년생별, MBTI\n· 비교: 두 사람 중 누가 더 나이가 많은지, 누가 더 먼지, 공통점\n· 반 정보: 반장, CA, 담임, 교실, 식당, 총원", refs: [] };
+    }
+    var r = retrieve(q, 3);
+    if (!r.length) {
+      return { text: "관련 정보를 찾지 못했습니다. 사람 이름이나 '동네', '전공', '취미' 같은 단어를 넣어서 다시 물어봐 주세요.", refs: [] };
+    }
+    return { text: "정확히 맞는 답을 찾지 못해서 가장 관련 있는 문서를 보여 드립니다.\n\n" + r[0].doc.text, refs: r.filter(function (x) { return x.doc.mi !== undefined; }).map(function (x) { return x.doc.mi; }), retrieved: true };
+  }
+
+  function addMsg(who, text, refs, note) {
+    var log = $("chat-log");
+    var el = document.createElement("div");
+    el.className = "msg" + (who === "me" ? " me" : "");
+    var refHtml = "";
+    if (refs && refs.length) {
+      refHtml = '<div class="refs"><span class="lab">참고:</span>' + uniq(refs).slice(0, 8).map(function (i) {
+        return '<button type="button" data-cd="' + i + '">' + esc(M[i].n) + "</button>";
+      }).join("") + "</div>";
+    }
+    el.innerHTML = (who === "me" ? "" : '<span class="av" aria-hidden="true">7</span>') + '<div class="bb">' + esc(text) + (note ? '<div class="note" style="margin-top:6px">' + esc(note) + "</div>" : "") + refHtml + "</div>";
+    log.appendChild(el);
+    log.scrollTop = log.scrollHeight;
+    return el;
+  }
+  function removeMsg(el) {
+    if (el && el.parentNode) {
+      el.parentNode.removeChild(el);
+    }
+  }
+  function ask(q) {
+    if (!q.trim()) {
+      return;
+    }
+    addMsg("me", q);
+    st.chats += 1;
+    var local = answer(q);
+    if (st.ep) {
+      var ctx = retrieve(q, 3).map(function (r) { return r.doc.text; });
+      var ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+      var to = setTimeout(function () {
+        if (ctrl) {
+          ctrl.abort();
+        }
+      }, 60000);
+      var waiting = addMsg("bot", "RAG 서버에 묻는 중입니다...", [], "");
+      fetch(st.ep, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt: q, question: q, context: ctx }), signal: ctrl ? ctrl.signal : undefined })
+        .then(function (res) {
+          if (!res.ok) {
+            throw new Error("HTTP " + res.status);
+          }
+          return res.text();
+        })
+        .then(function (txt) {
+          clearTimeout(to);
+          var ans = txt;
+          try {
+            var j = JSON.parse(txt);
+            ans = j.answer || j.response || j.result || txt;
+          } catch (e) {
+            /* 텍스트 그대로 사용 */
+          }
+          removeMsg(waiting);
+          addMsg("bot", String(ans), local.refs, "RAG 서버(GMS) 응답");
+        })
+        .catch(function (err) {
+          clearTimeout(to);
+          removeMsg(waiting);
+          addMsg("bot", local.text, local.refs, "RAG 서버에 연결하지 못해(" + err.message + ") 페이지 안에서 답했습니다.");
+        });
+    } else {
+      addMsg("bot", local.text, local.refs, local.retrieved ? "검색 기반 답변" : "");
+    }
+    commit();
+  }
+  var SUGS = ["동탄 사는 사람 누구야?", "박현모 취미는?", "역삼에서 제일 먼 사람은?", "98년생 누구야?", "게임 좋아하는 사람", "이재원 마니또 추측은?", "고민주를 추측한 사람은?", "정재원이랑 이재준 중 누가 더 나이 많아?", "공대 누구 있어?", "같은 동네 사는 사람", "반장 누구야?", "식당 몇 층이야?"];
+
+
+  /* ================= 기본 ================= */
+  var TS = 16;
+  var SC = 3;
+  var VW = 15;
+  var VH = 11;
+  var cv = $("game");
+  var g = cv.getContext("2d");
+  cv.width = VW * TS * SC;
+  cv.height = VH * TS * SC;
+  g.imageSmoothingEnabled = false;
+  var DEFAULT_EP = "http://localhost:8000/api/v1/chat";
+  var T_SPEED = 2.3;
+  var FOLLOW_MAX = 9;
+  var LOSE_DIST = 9;
+  var LOSE_MS = 2500;
+  function byName(n) {
+    return M.filter(function (d) { return d.n === n; })[0];
+  }
+  var LEADER = byName(CLS.leader);
+  var CAP = byName(CLS.ca);
+  var CODE = String(LEADER.y).slice(2) + String(CAP.y).slice(2);
+  var B1CODE = (String(CLS.cohort).replace(/\D/g, "") + ("0" + String(CLS.cls).replace(/\D/g, "")).slice(-2));
+  function jong(w) {
+    var c = w.charCodeAt(w.length - 1);
+    if (c < 0xAC00 || c > 0xD7A3) {
+      return false;
+    }
+    return (c - 0xAC00) % 28 !== 0;
+  }
+  function jo(w, a, b) {
+    return w + (jong(w) ? a : b);
+  }
+
+  /* ================= 소리 (Web Audio 합성) ================= */
+  var AU = { ctx: null, master: null, sfx: null, verb: null, musA: null, musB: null, on: true, nextEerie: 0, mNext: 0, mStep: 0, mode: "explore", stepAlt: false };
+  try {
+    AU.on = localStorage.getItem("ssafy7-escape-sound") !== "off";
+  } catch (e) {
+    /* 기본값 */
+  }
+  function noiseBuf(sec) {
+    var c = AU.ctx;
+    var b = c.createBuffer(1, Math.floor(c.sampleRate * sec), c.sampleRate);
+    var d = b.getChannelData(0);
+    var i;
+    for (i = 0; i < d.length; i++) {
+      d[i] = Math.random() * 2 - 1;
+    }
+    return b;
+  }
+  function impulse(sec, decay) {
+    var c = AU.ctx;
+    var len = Math.floor(c.sampleRate * sec);
+    var b = c.createBuffer(2, len, c.sampleRate);
+    var ch2;
+    for (ch2 = 0; ch2 < 2; ch2++) {
+      var d = b.getChannelData(ch2);
+      var i;
+      for (i = 0; i < len; i++) {
+        d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
+      }
+    }
+    return b;
+  }
+  function auInit() {
+    if (AU.ctx) {
+      if (AU.ctx.state === "suspended") {
+        AU.ctx.resume();
+      }
+      return;
+    }
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) {
+      return;
+    }
+    try {
+      AU.ctx = new AC();
+    } catch (e) {
+      return;
+    }
+    var c = AU.ctx;
+    AU.master = c.createGain();
+    AU.master.gain.value = AU.on ? 0.85 : 0;
+    AU.master.connect(c.destination);
+    AU.verb = c.createConvolver();
+    AU.verb.buffer = impulse(2.8, 2.4);
+    var vg = c.createGain();
+    vg.gain.value = 0.55;
+    AU.verb.connect(vg);
+    vg.connect(AU.master);
+    AU.sfx = c.createGain();
+    AU.sfx.gain.value = 1;
+    AU.sfx.connect(AU.master);
+    AU.musA = c.createGain();
+    AU.musA.gain.value = 0.55;
+    AU.musA.connect(AU.master);
+    AU.musA.connect(AU.verb);
+    AU.musB = c.createGain();
+    AU.musB.gain.value = 0;
+    AU.musB.connect(AU.master);
+    var drone = c.createGain();
+    drone.gain.value = 0.05;
+    var dlp = c.createBiquadFilter();
+    dlp.type = "lowpass";
+    dlp.frequency.value = 240;
+    drone.connect(dlp);
+    dlp.connect(AU.master);
+    [[41.2, "sine"], [41.9, "sine"], [61.7, "triangle"]].forEach(function (o) {
+      var osc = c.createOscillator();
+      osc.type = o[1];
+      osc.frequency.value = o[0];
+      osc.connect(drone);
+      osc.start();
+    });
+    var wind = c.createBufferSource();
+    wind.buffer = noiseBuf(2);
+    wind.loop = true;
+    var bp = c.createBiquadFilter();
+    bp.type = "bandpass";
+    bp.frequency.value = 380;
+    bp.Q.value = 0.7;
+    var wg = c.createGain();
+    wg.gain.value = 0.02;
+    var wl = c.createOscillator();
+    wl.frequency.value = 0.09;
+    var wlg = c.createGain();
+    wlg.gain.value = 0.015;
+    wl.connect(wlg);
+    wlg.connect(wg.gain);
+    wl.start();
+    wind.connect(bp);
+    bp.connect(wg);
+    wg.connect(AU.master);
+    wind.start();
+    AU.mNext = c.currentTime + 0.2;
+  }
+  function auSetOn(on) {
+    AU.on = on;
+    try {
+      localStorage.setItem("ssafy7-escape-sound", on ? "on" : "off");
+    } catch (e) {
+      /* 무시 */
+    }
+    $("hud-snd").textContent = on ? "소리 켬" : "소리 끔";
+    if (AU.master) {
+      AU.master.gain.setTargetAtTime(on ? 0.85 : 0, AU.ctx.currentTime, 0.05);
+    }
+  }
+  function mf(m) {
+    return 440 * Math.pow(2, (m - 69) / 12);
+  }
+  function osc(dest, freq, t0, dur, type, vol, glideTo, attack) {
+    var c = AU.ctx;
+    var o = c.createOscillator();
+    o.type = type || "sine";
+    o.frequency.setValueAtTime(freq, t0);
+    if (glideTo) {
+      o.frequency.exponentialRampToValueAtTime(glideTo, t0 + dur);
+    }
+    var gg = c.createGain();
+    gg.gain.setValueAtTime(0.0001, t0);
+    gg.gain.exponentialRampToValueAtTime(vol, t0 + (attack || Math.min(0.02, dur / 4)));
+    gg.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(gg);
+    gg.connect(dest);
+    o.start(t0);
+    o.stop(t0 + dur + 0.05);
+  }
+  function noise(dest, t0, dur, vol, type, f1, f2, q) {
+    var c = AU.ctx;
+    var n = c.createBufferSource();
+    n.buffer = noiseBuf(Math.max(0.05, dur + 0.05));
+    var fl = c.createBiquadFilter();
+    fl.type = type || "lowpass";
+    fl.frequency.setValueAtTime(f1, t0);
+    if (f2) {
+      fl.frequency.exponentialRampToValueAtTime(f2, t0 + dur);
+    }
+    fl.Q.value = q || 0.8;
+    var gg = c.createGain();
+    gg.gain.setValueAtTime(vol, t0);
+    gg.gain.exponentialRampToValueAtTime(0.0008, t0 + dur);
+    n.connect(fl);
+    fl.connect(gg);
+    gg.connect(dest);
+    n.start(t0);
+    n.stop(t0 + dur + 0.05);
+  }
+  function panned(vol, pan, wet) {
+    var c = AU.ctx;
+    var out = c.createGain();
+    out.gain.value = vol;
+    if (c.createStereoPanner) {
+      var p = c.createStereoPanner();
+      p.pan.value = Math.max(-1, Math.min(1, pan || 0));
+      out.connect(p);
+      p.connect(AU.sfx);
+      if (wet) {
+        p.connect(AU.verb);
+      }
+    } else {
+      out.connect(AU.sfx);
+    }
+    return out;
+  }
+  /* 바닥 재질별 발소리 */
+  var SURF = { wood: "wood", parquet: "wood", carpetGray: "carpet", carpetGreen: "carpet", carpetBlue: "carpet", wine: "carpet", lino: "lino", linoDark: "lino", marble: "tile", checker: "tile", toiletPink: "tile", toiletBlue: "tile", toiletGreen: "tile", concrete: "concrete", tech: "metal", raised: "metal" };
+  var HARD = { tile: 1, concrete: 1, metal: 1 };
+  function surfOf(mapId) {
+    var m = MAPS[mapId];
+    return (m && SURF[m.floor]) || "lino";
+  }
+  function footLayer(out, surf, t0, heavy) {
+    var r = Math.random();
+    if (surf === "wood") {
+      osc(out, heavy ? 120 + r * 20 : 190 + r * 30, t0, heavy ? 0.14 : 0.09, "triangle", 0.6, heavy ? 60 : 95);
+      noise(out, t0, heavy ? 0.09 : 0.07, 0.7, "bandpass", heavy ? 800 : 1100, 500, 2.5);
+      if (r < (heavy ? 0.4 : 0.12)) {
+        osc(out, 500 + r * 120, t0 + 0.05, 0.28, "sine", heavy ? 0.08 : 0.04, 450);
+      }
+    } else if (surf === "carpet") {
+      noise(out, t0, heavy ? 0.18 : 0.14, heavy ? 1.0 : 0.8, "lowpass", heavy ? 420 : 560, 150, 0.7);
+      osc(out, heavy ? 70 : 95, t0, heavy ? 0.13 : 0.08, "sine", heavy ? 0.7 : 0.3, 48);
+      noise(out, t0 + 0.03, 0.1, heavy ? 0.12 : 0.08, "bandpass", 2400, 1600, 1);
+    } else if (surf === "tile") {
+      noise(out, t0, 0.035, heavy ? 1.0 : 0.8, "highpass", heavy ? 2400 : 3400);
+      osc(out, heavy ? 420 : 900, t0, 0.045, "triangle", heavy ? 0.4 : 0.25, heavy ? 280 : 700);
+      noise(out, t0, 0.09, 0.45, "bandpass", heavy ? 1300 : 1900, 1100, 3);
+    } else if (surf === "concrete") {
+      noise(out, t0, 0.1, 0.8, "bandpass", heavy ? 500 : 750, 320, 1.2);
+      noise(out, t0, 0.05, 0.35, "highpass", 4500);
+      osc(out, heavy ? 60 : 100, t0, 0.1, "sine", heavy ? 0.6 : 0.35, 42);
+    } else if (surf === "metal") {
+      osc(out, heavy ? 190 : 330, t0, heavy ? 0.22 : 0.15, "square", 0.05);
+      osc(out, heavy ? 287 : 497, t0, heavy ? 0.18 : 0.12, "triangle", 0.14);
+      osc(out, heavy ? 611 : 1043, t0, 0.08, "sine", 0.06);
+      noise(out, t0, 0.05, 0.5, "bandpass", 2600, 1500, 4);
+    } else {
+      noise(out, t0, 0.08, 0.7, "bandpass", heavy ? 1000 : 1400, 800, 1.5);
+      osc(out, heavy ? 85 : 130, t0, 0.08, "sine", heavy ? 0.5 : 0.3, 65);
+      if (!heavy && r < 0.15) {
+        osc(out, 2300, t0 + 0.02, 0.06, "sine", 0.03, 2700);
+      }
+    }
+  }
+  function stepPlayer() {
+    if (!AU.ctx) {
+      return;
+    }
+    var t0 = AU.ctx.currentTime;
+    var surf = surfOf(P.map);
+    AU.stepAlt = !AU.stepAlt;
+    var vol = surf === "carpet" ? 0.3 : 0.34;
+    var out = panned(vol, AU.stepAlt ? -0.15 : 0.15, !!HARD[surf]);
+    footLayer(out, surf, t0, false);
+  }
+  function stepBoss(vol, pan, light) {
+    if (!AU.ctx || vol < 0.02) {
+      return;
+    }
+    var t0 = AU.ctx.currentTime;
+    var surf = surfOf(TCH.map || P.map);
+    var out = panned(vol, pan, true);
+    footLayer(out, surf, t0, true);
+    if (!light) {
+      osc(out, 78, t0, 0.22, "sine", surf === "carpet" ? 0.6 : 0.9, 34);
+      osc(out, 160, t0, 0.07, "triangle", 0.3, 90);
+    }
+  }
+  function growl(vol, pan) {
+    if (!AU.ctx || vol < 0.02) {
+      return;
+    }
+    var c = AU.ctx;
+    var t0 = c.currentTime;
+    var out = panned(vol, pan, true);
+    var lp = c.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = 340;
+    var amp = c.createGain();
+    amp.gain.setValueAtTime(0.0001, t0);
+    amp.gain.exponentialRampToValueAtTime(0.5, t0 + 0.25);
+    amp.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.3);
+    var trem = c.createOscillator();
+    trem.frequency.value = 7;
+    var tg = c.createGain();
+    tg.gain.value = 0.25;
+    trem.connect(tg);
+    tg.connect(amp.gain);
+    [43, 45.5, 64].forEach(function (f) {
+      var o = c.createOscillator();
+      o.type = "sawtooth";
+      o.frequency.setValueAtTime(f, t0);
+      o.frequency.linearRampToValueAtTime(f * 0.85, t0 + 1.3);
+      o.connect(lp);
+      o.start(t0);
+      o.stop(t0 + 1.4);
+    });
+    lp.connect(amp);
+    amp.connect(out);
+    trem.start(t0);
+    trem.stop(t0 + 1.4);
+  }
+  function heartbeat(vol) {
+    if (!AU.ctx) {
+      return;
+    }
+    var t0 = AU.ctx.currentTime;
+    osc(AU.sfx, 60, t0, 0.18, "sine", vol, 38);
+    osc(AU.sfx, 56, t0 + 0.22, 0.18, "sine", vol * 0.75, 36);
+  }
+  function sfx(name) {
+    if (!AU.ctx) {
+      return;
+    }
+    var c = AU.ctx;
+    var t0 = c.currentTime;
+    var S2 = AU.sfx;
+    if (name === "item") {
+      osc(S2, 660, t0, 0.14, "triangle", 0.12);
+      osc(S2, 990, t0 + 0.1, 0.3, "triangle", 0.1);
+    } else if (name === "door") {
+      noise(S2, t0, 0.4, 0.25, "bandpass", 500, 180, 3);
+      osc(S2, 90, t0, 0.3, "sine", 0.3, 50);
+    } else if (name === "elev") {
+      osc(S2, 880, t0, 0.6, "sine", 0.08);
+      osc(S2, 698, t0 + 0.3, 0.8, "sine", 0.07);
+    } else if (name === "stinger") {
+      [mf(45), mf(46), mf(52), mf(58), mf(63)].forEach(function (f, i) {
+        osc(AU.verb, f * 2, t0, 1.8, "sawtooth", 0.06, f * 1.8, 0.01 + i * 0.01);
+      });
+      noise(S2, t0, 0.5, 0.5, "highpass", 3000, 800);
+      osc(S2, 55, t0, 0.8, "sine", 0.6, 30);
+    } else if (name === "scare") {
+      noise(AU.verb, t0, 1.6, 0.4, "bandpass", 300, 4000, 4);
+      osc(AU.verb, mf(80), t0, 1.4, "sine", 0.05, mf(78));
+    } else if (name === "good") {
+      [523, 659, 784].forEach(function (f, i) {
+        osc(S2, f, t0 + i * 0.1, 0.3, "triangle", 0.1);
+      });
+    } else if (name === "bad") {
+      osc(S2, 110, t0, 0.7, "sawtooth", 0.09, 70);
+      osc(S2, 116, t0, 0.7, "sawtooth", 0.07, 73);
+    } else if (name === "tick") {
+      osc(S2, 1200, t0, 0.05, "square", 0.03);
+    } else if (name === "lost") {
+      osc(AU.verb, 392, t0, 1.6, "sine", 0.05, 196);
+    } else if (name === "open") {
+      [523, 784, 1046].forEach(function (f, i) {
+        osc(S2, f, t0 + i * 0.08, 0.2, "square", 0.04);
+      });
+    } else if (name === "knock") {
+      [0, 0.25, 0.5].forEach(function (d) {
+        osc(AU.verb, 160, t0 + d, 0.12, "sine", 0.5, 70);
+        noise(AU.verb, t0 + d, 0.08, 0.4, "lowpass", 600);
+      });
+    } else if (name === "flicker") {
+      noise(S2, t0, 0.25, 0.08, "highpass", 6000);
+      osc(S2, 120, t0, 0.25, "square", 0.02);
+    } else if (name === "bark") {
+      osc(S2, 520, t0, 0.12, "sawtooth", 0.06, 380);
+      osc(S2, 560, t0 + 0.18, 0.12, "sawtooth", 0.05, 400);
+    }
+  }
+  var MEL = [69, 0, 72, 0, 76, 0, 75, 0, 74, 0, 72, 0, 71, 0, 0, 0, 69, 0, 72, 0, 76, 0, 79, 0, 78, 0, 76, 0, 75, 0, 0, 0, 65, 0, 69, 0, 72, 0, 71, 0, 69, 0, 68, 0, 0, 0, 0, 0, 64, 0, 0, 0, 63, 0, 0, 0, 64, 0, 0, 0, 0, 0, 0, 0];
+  var CHORDS = [[45, 57, 60, 64], [41, 53, 57, 60], [38, 50, 53, 57], [40, 52, 56, 59]];
+  function musicTick() {
+    if (!AU.ctx || state === "title") {
+      return;
+    }
+    var c = AU.ctx;
+    var chase = teacherVisible() && TCH.state === "chase";
+    var mode = chase ? "chase" : "explore";
+    if (mode !== AU.mode) {
+      AU.mode = mode;
+      AU.musA.gain.setTargetAtTime(chase ? 0.0 : 0.55, c.currentTime, 0.6);
+      AU.musB.gain.setTargetAtTime(chase ? 0.6 : 0.0, c.currentTime, 0.3);
+    }
+    var dur = chase ? 0.2 : 0.42;
+    while (AU.mNext < c.currentTime + 0.35) {
+      var t = AU.mNext;
+      var s = AU.mStep;
+      var bar = Math.floor(s / 16) % 4;
+      if (!chase) {
+        var n = MEL[s % MEL.length];
+        if (n) {
+          osc(AU.musA, mf(n), t, 1.6, "sine", 0.05, null, 0.005);
+          osc(AU.musA, mf(n) * 2.01, t, 0.6, "sine", 0.012, null, 0.005);
+        }
+        if (s % 16 === 0) {
+          CHORDS[bar].forEach(function (m, i) {
+            osc(AU.musA, mf(m), t, dur * 16, i === 0 ? "triangle" : "sine", i === 0 ? 0.035 : 0.018, null, 1.2);
+          });
+        }
+      } else {
+        var root = CHORDS[bar][0] - 12;
+        osc(AU.musB, mf(s % 2 ? root + 12 : root), t, 0.18, "sawtooth", 0.07, null, 0.005);
+        if (s % 4 === 0) {
+          osc(AU.musB, 58, t, 0.22, "sine", 0.35, 34, 0.003);
+        }
+        if (s % 8 === 4) {
+          osc(AU.musB, mf(CHORDS[bar][1] + 12), t, 0.35, "sawtooth", 0.035);
+          osc(AU.musB, mf(CHORDS[bar][1] + 13), t, 0.35, "sawtooth", 0.03);
+        }
+        if (s % 2 === 1) {
+          noise(AU.musB, t, 0.05, 0.08, "highpass", 7000);
+        }
+      }
+      AU.mStep += 1;
+      AU.mNext += dur;
+    }
+  }
+  function eerieTick() {
+    if (!AU.ctx || gt < AU.nextEerie) {
+      return;
+    }
+    AU.nextEerie = gt + 18000 + Math.random() * 15000;
+    var t0 = AU.ctx.currentTime;
+    if (Math.random() < 0.5) {
+      noise(AU.verb, t0, 0.9, 0.12, "bandpass", 900, 300, 6);
+    } else {
+      osc(AU.verb, 1046, t0, 2.5, "sine", 0.02, 988);
+    }
+  }
+
+  /* ================= 도트 캐릭터 ================= */
+  var BODY = {
+    down: ["................", ".....OOOOOO.....", "....OHHHHHHO....", "...OHHHHHHHHO...", "...OHSSSSSSHO...", "...OSESSSSESO...", "...OSSSSSSSSO...", "....OSSSSSSO....", "...OCCCCCCCCO...", "..OSCCCCCCCCSO..", "..OSCCCCCCCCSO..", "...OccccccccO..."],
+    up: ["................", ".....OOOOOO.....", "....OHHHHHHO....", "...OHHHHHHHHO...", "...OHHHHHHHHO...", "...OHHHHHHHHO...", "...OSHHHHHHSO...", "....OSSSSSSO....", "...OCCCCCCCCO...", "..OSCCCCCCCCSO..", "..OSCCCCCCCCSO..", "...OccccccccO..."],
+    left: ["................", ".....OOOOOO.....", "....OHHHHHHO....", "...OHHHHHHHHO...", "...OSSSHHHHHO...", "...OESSSHHHHO...", "...OSSSSSSHHO...", "....OSSSSSSO....", "....OCCCCCCO....", "....OSCCCCCO....", "....OSCCCCCO....", "....OccccccO...."]
+  };
+  var LEGS = {
+    front: [["....OPPOOPPO....", "....OPPOOPPO....", "....OKKOOKKO...."], ["....OPPOOPPO....", "....OPPO.OKKO...", "....OKKO........"], ["....OPPOOPPO....", "...OKKO.OPPO....", "........OKKO...."]],
+    side: [[".....OPPPPO.....", ".....OPPPPO.....", ".....OKKKKO....."], [".....OPPPPO.....", ".....OPPOPPO....", "....OKKO.OKKO..."], [".....OPPPPO.....", "....OPPOPPO.....", "...OKKO.OKKO...."]]
+  };
+  var DIRS = ["down", "left", "right", "up"];
+  var HAIRS = ["#2B1D14", "#3B2A20", "#5A3A22", "#1E1E24", "#6B4A2E", "#7A4E33", "#4A2E3A", "#2E2A3A"];
+  var SKINS = ["#F2D3B3", "#EBC6A1", "#F5DCC4", "#E8C09A"];
+  var SHIRTS = ["#E2574C", "#3E8EDE", "#4CB872", "#F2A93B", "#9B6ADE", "#E86FA6", "#2FB8B0", "#D9D45A", "#F07B3F", "#6C8CFF", "#5BC0EB", "#C46B5A", "#7DBB4C", "#B85CC9"];
+  var PANTS = ["#2E3A55", "#3A3A44", "#4B3B2B", "#26324A", "#55586A", "#3D2F4F"];
+  function shade(hex, f) {
+    var n = parseInt(hex.slice(1), 16);
+    return "rgb(" + Math.round(((n >> 16) & 255) * f) + "," + Math.round(((n >> 8) & 255) * f) + "," + Math.round((n & 255) * f) + ")";
+  }
+  function makeSheet(pal) {
+    var c = document.createElement("canvas");
+    c.width = TS * 3;
+    c.height = TS * 4;
+    var x = c.getContext("2d");
+    var colors = { O: "#1A1420", H: pal.H, S: pal.S, E: "#2A1E1E", C: pal.C, c: shade(pal.C, 0.78), P: pal.P, K: "#2B2B2B" };
+    DIRS.forEach(function (dir, di) {
+      var base = dir === "right" ? "left" : dir;
+      var side = base === "left";
+      var f;
+      for (f = 0; f < 3; f++) {
+        var rows = BODY[base].map(function (r) { return r.split(""); });
+        (side ? LEGS.side : LEGS.front)[f].forEach(function (r) { rows.push(r.split("")); });
+        rows.push("................".split(""));
+        if (pal.long) {
+          var yy;
+          for (yy = 4; yy <= 8; yy++) {
+            if (side) {
+              rows[yy][12] = "H";
+              rows[yy][13] = "O";
+            } else {
+              rows[yy][3] = "H";
+              rows[yy][12] = "H";
+              rows[yy][2] = "O";
+              rows[yy][13] = "O";
+            }
+          }
+        }
+        var py;
+        for (py = 0; py < 16; py++) {
+          var px;
+          for (px = 0; px < 16; px++) {
+            var chr = rows[py][dir === "right" ? 15 - px : px];
+            if (chr && chr !== "." && colors[chr]) {
+              x.fillStyle = colors[chr];
+              x.fillRect(f * TS + px, di * TS + py, 1, 1);
+            }
+          }
+        }
+      }
+    });
+    return c;
+  }
+  /* 이자룡 강사(괴물 모습) 32x44 프레임: 4방향 x 2프레임 */
+  var BW = 20;
+  var BH = 30;
+  var HEAD_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACYAAAAsCAYAAAAJpsrIAAAEFklEQVR4nMWZz0sbQRTHvxFPQUpg0diAB1kWwbBgPEiENimlB4+C0ItI8VDB4lVQ/wAV26Mo9CKlehEU8WQhFCJCg4fkEBIoYemhEDBFkB7Si5gekjeZnR+7m1jt96K78+uzb2beezMJ4X5q+JSHuu24m4YM5vWrA8+Kh5nZrsfptEEjMbwAALDMtG/lipMFABR+fOx4vKAVGwBAUABwdV10VbipO4iETfYcNWypkxZgoDGDVGqogG7qjm9DAuUhg8L5VZCgggD5AQaB8ypkUN0CqRQJm4gati+crqCRGF74p0AqwOrvb1oGLVi4d+BBgHh5wanAHgWKVL+tKTl6hOdG7MnkowCRWkaQIogI9mBrqlPxYI9uLZLKai6LkbV4D/6/1Cu+UEGp3ummnK97n2VBu0G7E0eGprUBu+JkWRkFbPEZCB7G+B2qBYuETTybWIJpjSJuxzw7LBWr2jKnUmagfg6bB5OmkqDezO4gbscwnmwD53M1ZYdzb8eUZaViFaY1Kr0PMsVKsKhhMyvlczWUilXJajyw+ExtyFokfkn4wSnBpqYWAbiniAbiLaCyZqlYxdnZrnIwy0wzuI7BRoamEbdjDIRLjwEAq1ZBu+boQ7iMFUA7waTNYplp5XoL9w6gfltrAAixxR97MombusN24cXlNgVYSauLBQBggLxlN3YTyjaUrfBJ4/efJ1I92gBSSCJTE9SvqnwQ2thNwKmUcXqcYZb9dPCOQanakBVVMCTeB7KppC8xrVHsfZ5nFfpj6szoPPe+9Vcu07W5u/vDZqTiZBEJm67pjBo2MwgDI0v5+Sxe83N7bD3yH+MlGofWGSkSNl1ZbY+qUVCJfq5biZaTwMgVfD0vYLBvTNvRYN8YPmx9wXhygLmJVHLZt00quawsixq2FI9dYPw06uB4KMDty572T2jbpJLLyigAQNqtgMbB8nAvU+7tz0MBbcdKg1pmmm0M0vzcHgC4IkHFySoPxSR++zRWFwvadUMANH0Upk6PM7i43EbUsGGZaWXQJz8ngvESj3OeFhPFA9PgTUstadv4QZHrEOUCcyplrbvgoej/fK6GuB1jLkMnMZjzUkEB7sUfOszMeg4AAFMvnnuWA00rra3MKPtSgahO5YGnktbV+uYRg1vfPGIhiQa8vm5aJznRzFC81pWXlAfe/Z0raQOoEsG1lRnpnWG0dyftVB4ccLsH3R2G9oqgnPe7xdQnhLy/EqEIDIDn5Yp2KvO5WuBwo3OcOii65PO68fG8htrfuQIgp9EkXZ6vA+OTQ92dRRAwwMfpinA6KDFb9YMKAga0stutzRMA6jyfh/I7rgWBCgoGtO4VaGp5EBJZyOtwGxSqEzAGSPm+11RpgDoa714/QPhd8HUD1HUDQQ/2k81f34tU8R5QF2YAAAAASUVORK5CYII=";
+  var HEAD = new Image();
+  var HW = 38;
+  var HH = 44;
+  var EYES = {};
+  function ellipse(x, cx, cy, rx, ry, col) {
+    x.fillStyle = col;
+    var yy;
+    for (yy = Math.floor(cy - ry); yy <= Math.ceil(cy + ry); yy++) {
+      var xx;
+      for (xx = Math.floor(cx - rx); xx <= Math.ceil(cx + rx); xx++) {
+        var dx = (xx + 0.5 - cx) / rx;
+        var dy = (yy + 0.5 - cy) / ry;
+        if (dx * dx + dy * dy <= 1) {
+          x.fillRect(xx, yy, 1, 1);
+        }
+      }
+    }
+  }
+  /* 이자룡 강사(사진을 바탕으로 한 보라색 괴물): 머리는 2배 해상도, 몸은 도트 */
+  function makeBoss(c) {
+    c = c || document.createElement("canvas");
+    c.width = BW * 2 * 2;
+    c.height = BH * 2 * 4;
+    var x = c.getContext("2d");
+    x.imageSmoothingEnabled = false;
+    x.clearRect(0, 0, c.width, c.height);
+    var SKIN = "#8C7BD8";
+    var SKIN2 = "#5E4FA8";
+    var JK = "#3B2A22";
+    var JK2 = "#5A4234";
+    var NECK = "#0A0A0C";
+    var ready = HEAD.complete && HEAD.naturalWidth > 0;
+    DIRS.forEach(function (dir, di) {
+      var f;
+      for (f = 0; f < 2; f++) {
+        x.save();
+        x.translate(f * BW * 2, di * BH * 2);
+        if (dir === "right") {
+          x.translate(BW * 2, 0);
+          x.scale(-1, 1);
+        }
+        var side = dir === "left" || dir === "right";
+        var bob = f;
+        x.save();
+        x.scale(2, 2);
+        var lg = side ? (f === 0 ? [7, 10] : [8, 9]) : (f === 0 ? [6, 11] : [7, 10]);
+        x.fillStyle = "#1A1A20";
+        x.fillRect(lg[0], 27, 3, 2);
+        x.fillRect(lg[1], 27, 3, 2);
+        x.fillStyle = "#000";
+        x.fillRect(lg[0], 29, 3, 1);
+        x.fillRect(lg[1], 29, 3, 1);
+        x.fillStyle = JK;
+        if (side) {
+          x.fillRect(6, 20 + bob, 8, 7);
+          x.fillStyle = NECK;
+          x.fillRect(6, 20 + bob, 3, 2);
+          x.fillStyle = JK2;
+          x.fillRect(12, 21 + bob, 1, 6);
+          x.fillStyle = JK;
+          x.fillRect(2, 22 + bob, 6, 2);
+          x.fillStyle = SKIN;
+          x.fillRect(0, 21 + bob, 2, 4);
+          x.fillStyle = JK;
+          x.fillRect(11, 22 + bob, 3, 5);
+          x.fillStyle = SKIN2;
+          x.fillRect(11, 27 + bob, 3, 1);
+        } else {
+          x.fillRect(5, 20 + bob, 10, 7);
+          if (dir !== "up") {
+            x.fillStyle = NECK;
+            x.fillRect(8, 20 + bob, 4, 6);
+            x.fillStyle = JK2;
+            x.fillRect(7, 21 + bob, 1, 5);
+            x.fillRect(12, 21 + bob, 1, 5);
+          }
+          x.fillStyle = JK;
+          x.fillRect(3, 21 + bob, 2, 6);
+          x.fillRect(15, 21 + bob, 2, 6);
+          x.fillStyle = SKIN;
+          x.fillRect(3, 27 + bob, 2, 1);
+          x.fillRect(15, 27 + bob, 2, 1);
+        }
+        x.restore();
+        if (dir === "up" || !ready) {
+          x.save();
+          x.scale(2, 2);
+          ellipse(x, 10, 11 + bob, 9.5, 11, "#000");
+          ellipse(x, 10, 11 + bob, 8.6, 10.2, "#141020");
+          ellipse(x, 8, 5 + bob, 3.5, 2, "#2A2238");
+          x.restore();
+        } else if (side) {
+          x.drawImage(HEAD, 0, 0, HW, HH, 2, bob * 2, 32, HH);
+        } else {
+          x.drawImage(HEAD, 0, 0, HW, HH, 1, bob * 2, HW, HH);
+        }
+        x.restore();
+      }
+    });
+    return c;
+  }
+  var BOSS = makeBoss();
+  HEAD.onload = function () {
+    makeBoss(BOSS);
+  };
+  HEAD.src = HEAD_SRC;
+  function drawFace(canvas, who) {
+    var x = canvas.getContext("2d");
+    x.imageSmoothingEnabled = false;
+    x.clearRect(0, 0, canvas.width, canvas.height);
+    if (who === "이자룡") {
+      x.fillStyle = "#000";
+      x.fillRect(0, 0, canvas.width, canvas.height);
+      if (HEAD.complete && HEAD.naturalWidth > 0) {
+        x.drawImage(HEAD, 0, 0, HW, HH, (canvas.width - 46) / 2, 1, 46, 53);
+      } else {
+        x.drawImage(BOSS, 0, 0, BW * 2, 44, 10, 2, 44, 44);
+      }
+      return;
+    }
+    x.drawImage(SHEETS[who], 0, 0, 16, 12, 0, 4, 64, 48);
+  }
+  var SHEETS = {};
+  M.forEach(function (d) {
+    var h = hash(d.n);
+    SHEETS[d.n] = makeSheet({ H: HAIRS[h % HAIRS.length], S: SKINS[(h >>> 4) % SKINS.length], C: SHIRTS[(h >>> 8) % SHIRTS.length], P: PANTS[(h >>> 12) % PANTS.length], long: d.g === "W" });
+  });
+  SHEETS["박민희"] = makeSheet({ H: "#3B2A20", S: "#F2D3B3", C: "#8E6CC8", P: "#3A3A44", long: true });
+  SHEETS["나"] = makeSheet({ H: "#1E1E24", S: "#F2D3B3", C: "#2F6FDE", P: "#26324A", long: false });
+  SHEETS["이자룡"] = BOSS;
+  SHEETS["7반 봇"] = (function () {
+    var c = document.createElement("canvas");
+    c.width = 16;
+    c.height = 16;
+    var x = c.getContext("2d");
+    x.fillStyle = "#1A1420";
+    x.fillRect(2, 1, 12, 10);
+    x.fillStyle = "#39C5BB";
+    x.fillRect(3, 2, 10, 8);
+    x.fillStyle = "#0D3B38";
+    x.fillRect(5, 4, 2, 2);
+    x.fillRect(9, 4, 2, 2);
+    x.fillRect(6, 7, 4, 1);
+    return c;
+  })();
+  SHEETS["똘이"] = (function () {
+    var c = document.createElement("canvas");
+    c.width = TS * 3;
+    c.height = TS * 4;
+    var x = c.getContext("2d");
+    var di;
+    for (di = 0; di < 4; di++) {
+      var f;
+      for (f = 0; f < 3; f++) {
+        var ox = f * TS;
+        var oy = di * TS;
+        x.fillStyle = "#1A1420";
+        x.fillRect(ox + 3, oy + 7, 10, 6);
+        x.fillStyle = "#C8955A";
+        x.fillRect(ox + 4, oy + 8, 8, 4);
+        x.fillRect(ox + (di === 2 ? 3 : 9), oy + 5, 4, 4);
+        x.fillStyle = "#7A5230";
+        x.fillRect(ox + (di === 2 ? 3 : 12), oy + 4, 1, 2);
+        x.fillStyle = "#1A1420";
+        x.fillRect(ox + 4, oy + 12, 1, 2);
+        x.fillRect(ox + 11, oy + 12, 1, 2);
+        x.fillRect(ox + (di === 2 ? 4 : 11), oy + 6, 1, 1);
+      }
+    }
+    return c;
+  })();
+
+  /* ================= 맵 ================= */
+  function toilet(name, floor, wall, exitMap, ex, ey, exDir) {
+    return {
+      name: name, floor: floor, wall: wall, safe: true,
+      rows: ["#nnn##IIIIII##", "#............#", "#............#", "#............#", "#............#", "######E#######"],
+      exits: { "6,5": { map: exitMap, x: ex, y: ey, dir: exDir } },
+      spawns: [],
+      msg: { n: ["세면대와 거울이다. 거울 속 내 얼굴이 창백하다."], I: ["칸막이 문이다. 잠겨 있다."] }
+    };
+  }
+  var MAPS = {
+    lobby: {
+      name: "1층 로비", floor: "marble", wall: ["#5A5E66", "#4A4E56", "#2C2F35"],
+      rows: [
+        "##QQQQ#####VV#####U#######",
+        "#........................#",
+        "#P......................P#",
+        "#...bb....bb....bb....bb.#",
+        "#........................#",
+        "#........................#",
+        "#..hhhh..............P...#",
+        "#........................#",
+        "#P......................P#",
+        "#........................#",
+        "###########GG#############"
+      ],
+      exits: { "18,0": { map: "l2", x: 23, y: 1, dir: "down" } },
+      spawns: [[18, 1], [11, 1], [12, 1]],
+      msg: { Q: ["경비실이다. 불이 꺼져 있다."], P: ["로비 화분이다."], b: ["로비 소파다."], h: ["편의점 진열대다. 셔터가 내려가 있다."] }
+    },
+    l2: {
+      name: "2층 라운지", floor: "wine", wall: ["#6B4E4A", "#5A3F3B", "#33221F"],
+      rows: [
+        "#WWW##E##WWW##VV##WWW##H###U##",
+        "#............................#",
+        "#.bb..bb..............bb..bb.#",
+        "#............................#",
+        "#....OO........OO........OO..#",
+        "#............................#",
+        "#.bb..bb.................P...#",
+        "#............................#",
+        "#kk..hhh.............P.......#",
+        "##############################"
+      ],
+      exits: { "6,0": { map: "t2", x: 6, y: 4, dir: "up" }, "23,0": { map: "lobby", x: 18, y: 1, dir: "down" }, "27,0": { map: "hall3", x: 31, y: 5, dir: "up" } },
+      spawns: [[6, 1], [23, 1], [27, 1], [14, 1], [15, 1]],
+      signs: {},
+      msg: { W: ["창밖은 깜깜하다."], b: ["라운지 소파다."], O: ["라운지 테이블이다."], P: ["화분이다."], k: ["커피 머신이다."], h: ["간식 진열대다."] }
+    },
+    t2: toilet("2층 화장실", "toiletPink", ["#E8D6D6", "#D8C2C2", "#9A7E7E"], "l2", 6, 1, "down"),
+    hall3: {
+      name: "3층 복도", floor: "lino", wall: ["#C9D1C4", "#B3BBAE", "#6D7568"],
+      rows: [
+        "#WSE##WW#SE##WW#SE##WW###SE##WW#####",
+        "#..................................#",
+        "#..................................#",
+        "#..b......b......b........b........#",
+        "#..................................#",
+        "#..................................#",
+        "######VV####M##L######L####E###H#U##"
+      ],
+      exits: {
+        "3,0": { map: "r303", x: 8, y: 7, dir: "up" },
+        "10,0": { map: "r304", x: 18, y: 11, dir: "left" },
+        "17,0": { map: "r305", x: 8, y: 6, dir: "up" },
+        "26,0": { map: "office", x: 9, y: 7, dir: "up", need: "officeKey", lockMsg: "강사실이다. 문이 잠겨 있다.\n(강사실 열쇠가 필요하다)" },
+        "27,6": { map: "t3", x: 6, y: 4, dir: "up" },
+        "31,6": { map: "l2", x: 27, y: 1, dir: "down" },
+        "33,6": { map: "hall4", x: 33, y: 5, dir: "up" }
+      },
+      spawns: [[3, 1], [10, 1], [17, 1], [26, 1], [31, 5], [33, 5], [6, 5], [7, 5]],
+      signs: { "2,0": "303호 · 컴퓨터 실습실", "9,0": "304호 · SSAFY " + CLS.cohort + " 서울 " + CLS.cls, "16,0": "305호 · 스터디룸", "25,0": "강사실" },
+      msg: { W: ["창밖은 깜깜하다."], b: ["복도 벤치다."] }
+    },
+    r303: {
+      name: "303호 컴퓨터 실습실", floor: "carpetGray", wall: ["#9EA3A8", "#868B90", "#4C5156"], board: "chalk",
+      rows: [
+        "#WWW##BBBBBB##WWW#",
+        "#JJJJ........JJJJ#",
+        "#................#",
+        "#J...DDDDDD.....J#",
+        "#J...DDDDDD.....J#",
+        "#J..............J#",
+        "#.....XTT........#",
+        "#L...............#",
+        "########E#########"
+      ],
+      exits: { "8,8": { map: "hall3", x: 3, y: 1, dir: "down" } },
+      spawns: [[8, 7]],
+      msg: { B: ["분필 가루가 남은 칠판이다."], W: ["창밖은 깜깜하다."], J: ["실습용 PC다. 화면에 'Hello, Django!'가 떠 있다."], D: ["가운데 공용 작업대다."], T: ["교탁이다."] }
+    },
+    r304: {
+      name: "304호 교실", floor: "wood", wall: ["#D8D1C1", "#C2B9A5", "#857459"],
+      rows: [
+        "#WWW#BBBBBBBB#WWW###",
+        "#..................#",
+        "#P.....TTTT.......P#",
+        "#..................#",
+        "#..DD..DD..DD..DD..#",
+        "#..................#",
+        "#..DD..DD..DD..DD..#",
+        "#..................#",
+        "#..DD..DD..DD..DD..#",
+        "#..................#",
+        "#..DD..DD..DD..DD..#",
+        "#..................E",
+        "#KK..........LL....#",
+        "####################"
+      ],
+      exits: { "19,11": { map: "hall3", x: 10, y: 1, dir: "down" } },
+      spawns: [[18, 11]],
+      msg: { B: ["칠판에 적혀 있다.\n오늘 할 일: " + CLS.doing], W: ["창밖은 깜깜하다. 역삼 거리 불빛만 보인다."], P: ["교실 화분이다."], D: ["책상이다. 노트북이 덮여 있다."] }
+    },
+    r305: {
+      name: "305호 스터디룸", floor: "carpetGreen", wall: ["#C9A57A", "#B08D62", "#6E5236"], board: "notes",
+      rows: [
+        "#WWW##BBBB##FFFF##",
+        "#................#",
+        "#.rr...rr...rr...#",
+        "#.rr...rr...rr...#",
+        "#................#",
+        "#.....bb.....P...#",
+        "#L...............#",
+        "########E#########"
+      ],
+      exits: { "8,7": { map: "hall3", x: 17, y: 1, dir: "down" } },
+      spawns: [[8, 6]],
+      msg: { B: ["화이트보드에 RAG 구조도와 포스트잇이 붙어 있다."], W: ["창밖은 깜깜하다."], F: ["스터디룸 책장이다. 알고리즘 문제집이 꽂혀 있다."], r: ["원형 스터디 테이블이다."], b: ["소파다."], P: ["화분이다."] }
+    },
+    office: {
+      name: "강사실", floor: "lino", wall: ["#AEB8C2", "#97A2AD", "#56606B"],
+      rows: [
+        "#WWW#BBBB#FFFF#WW#",
+        "#................#",
+        "#.TT..TT..TT.....#",
+        "#................#",
+        "#.TT..TT..TT..X..#",
+        "#................#",
+        "#Y..............L#",
+        "#................#",
+        "#########E########"
+      ],
+      exits: { "9,8": { map: "hall3", x: 26, y: 1, dir: "down" } },
+      spawns: [[9, 7]],
+      msg: { W: ["창밖은 깜깜하다."], Y: ["복사기다. 과제 출력물이 남아 있다."], T: ["강사님 책상이다. 채점할 Django 과제가 산더미다."] }
+    },
+    t3: toilet("3층 화장실", "toiletBlue", ["#CFDDE8", "#BCCCD9", "#7C8E9E"], "hall3", 27, 5, "up"),
+    hall4: {
+      name: "4층 복도", floor: "linoDark", wall: ["#7E8794", "#6E7784", "#3E4652"],
+      rows: [
+        "#WWWSE######WWSE##WWW##SE#####SE####",
+        "#..................................#",
+        "#..................................#",
+        "#....P..........P..........P.......#",
+        "#..................................#",
+        "#..................................#",
+        "######VV####L#######L############H##"
+      ],
+      exits: {
+        "5,0": { map: "r401", x: 5, y: 7, dir: "up" },
+        "15,0": { map: "r402", x: 6, y: 6, dir: "up" },
+        "24,0": { map: "server", x: 7, y: 6, dir: "up" },
+        "31,0": { map: "t4", x: 6, y: 4, dir: "up" },
+        "33,6": { map: "hall3", x: 33, y: 5, dir: "up" }
+      },
+      spawns: [[5, 1], [15, 1], [24, 1], [33, 5], [6, 5], [7, 5]],
+      signs: { "4,0": "401호 · 프로그래밍 실습실", "14,0": "402호 · 세미나실", "23,0": "서버실", "30,0": "화장실" },
+      msg: { W: ["창밖은 깜깜하다."], P: ["시든 화분이다."] }
+    },
+    r401: {
+      name: "401호 프로그래밍 실습실", floor: "tech", wall: ["#3E5266", "#34465A", "#1E2A38"],
+      rows: [
+        "#WWW#BBBBBBBB#WWW###",
+        "#..................#",
+        "#.JJJ..JJJ..JJJ....#",
+        "#..................#",
+        "#.JJJ..JJJ..JJJ....#",
+        "#..................#",
+        "#.JJJ..JJJ..JJJ....#",
+        "#.................L#",
+        "#####E##############"
+      ],
+      exits: { "5,8": { map: "hall4", x: 5, y: 1, dir: "down" } },
+      spawns: [[5, 7]],
+      msg: { B: ["전자칠판에 'python manage.py runserver'가 적혀 있다."], W: ["창밖은 깜깜하다."], J: ["실습용 PC다. 누군가 VS Code를 켜 둔 채 나갔다."] }
+    },
+    r402: {
+      name: "402호 세미나실", floor: "carpetBlue", wall: ["#B7B0A2", "#A39C8E", "#5E584D"],
+      rows: [
+        "#WWWW##BBBB##WWWW#",
+        "#................#",
+        "#...eeeeeeeeee...#",
+        "#...eeeeeeeeee...#",
+        "#................#",
+        "#P..............P#",
+        "#L...............#",
+        "######E###########"
+      ],
+      exits: { "6,7": { map: "hall4", x: 15, y: 1, dir: "down" } },
+      spawns: [[6, 6]],
+      msg: { B: ["스크린에 '관통 프로젝트 발표 순서'가 띄워져 있다."], W: ["창밖은 깜깜하다."], e: ["긴 회의 테이블이다."], P: ["화분이다."] }
+    },
+    server: {
+      name: "서버실", floor: "raised", wall: ["#2A2F36", "#22262C", "#111317"],
+      rows: [
+        "################",
+        "#..............#",
+        "#.AA.AA.AA.AA..#",
+        "#.AA.AA.AA.AA..#",
+        "#..............#",
+        "#.AA.AA.AA.AA..#",
+        "#............K.#",
+        "#######E########"
+      ],
+      exits: { "7,7": { map: "hall4", x: 24, y: 1, dir: "down" } },
+      spawns: [[7, 6]],
+      msg: { A: ["서버 랙이다. LED가 깜빡인다. 팬 소리가 웅웅거린다."] }
+    },
+    t4: toilet("4층 화장실", "toiletGreen", ["#C4CCB8", "#B0B8A4", "#6C7462"], "hall4", 31, 1, "down"),
+    caf10: {
+      name: "10층 식당", floor: "checker", wall: ["#E8B27A", "#D49B60", "#8A5A30"],
+      rows: [
+        "#WWWW####VV####WWWW#",
+        "#..................#",
+        "#.OO..OO..OO..OO...#",
+        "#..................#",
+        "#.OO..OO..OO..OO...#",
+        "#..................#",
+        "#.OO..OO..OO..OO...#",
+        "#..................#",
+        "#RRRRRRRRRRRR..N...#",
+        "#..................#",
+        "####################"
+      ],
+      exits: {},
+      spawns: [[9, 1], [10, 1]],
+      msg: { W: ["10층 창밖 야경이다."], O: ["식탁이다."], R: ["배식대다. 오늘 배식은 끝났다."], N: ["안내판\n7반 식당: " + CLS.food] }
+    },
+    caf20: {
+      name: "20층 식당", floor: "parquet", wall: ["#2C3A5A", "#22304C", "#141C30"],
+      rows: [
+        "#WWWWWWWWVVWWWWWWWW#",
+        "#..................#",
+        "#.OO..OO..OO..OO...#",
+        "#..................#",
+        "#.OO..OO..OO..OO...#",
+        "#..................#",
+        "#.OO..OO..OO..OO...#",
+        "#..................#",
+        "#RRRRRRRRRRRR..N...#",
+        "#..................#",
+        "####################"
+      ],
+      exits: {},
+      spawns: [[9, 1], [10, 1]],
+      msg: { W: ["20층이라 역삼 야경이 한눈에 보인다."], O: ["식탁이다."], R: ["배식대다. 오늘 배식은 끝났다."], N: ["안내판\n7반 식당: " + CLS.food] }
+    },
+    b1: {
+      name: "B1 창고", floor: "concrete", wall: ["#4E4E4E", "#404040", "#262626"],
+      rows: [
+        "###########VV###########",
+        "#......................#",
+        "#.CC..CC..C..C..CC..CC.#",
+        "#.CC..CC.........CC..L.#",
+        "#......CCCC..CCCC......#",
+        "#.CC...............CC..#",
+        "#.CC..CC..........CC...#",
+        "#......................#",
+        "###########Z############",
+        "#.....................L#",
+        "#..CC..............CC..#",
+        "#......................#",
+        "########################"
+      ],
+      exits: {},
+      spawns: [[11, 1], [12, 1]],
+      msg: { C: ["먼지 쌓인 상자다."] }
+    }
+  };
+  var SOLID = { "#": 1, W: 1, B: 1, T: 1, D: 1, K: 1, L: 1, P: 1, V: 1, M: 1, b: 1, O: 1, R: 1, N: 1, S: 1, X: 1, F: 1, Y: 1, Q: 1, G: 1, C: 1, Z: 1, J: 1, A: 1, I: 1, n: 1, k: 1, h: 1, r: 1, e: 1, " ": 1 };
+  var ON_FLOOR = { ".": 1, D: 1, T: 1, K: 1, L: 1, P: 1, M: 1, b: 1, O: 1, R: 1, N: 1, X: 1, Y: 1, C: 1, z: 1, J: 1, A: 1, k: 1, h: 1, r: 1, e: 1 };
+  var WALL = MAPS.r304.wall;
+  function rect(x, c, a, b, w, h) {
+    x.fillStyle = c;
+    x.fillRect(a, b, w, h);
+  }
+  var FLOORS = {
+    wood: function (x) {
+      rect(x, "#B88F58", 0, 0, 16, 16);
+      rect(x, "#A47D4A", 0, 3, 16, 1);
+      rect(x, "#A47D4A", 0, 7, 16, 1);
+      rect(x, "#A47D4A", 0, 11, 16, 1);
+      rect(x, "#A47D4A", 0, 15, 16, 1);
+      rect(x, "#A47D4A", 5, 0, 1, 3);
+      rect(x, "#A47D4A", 11, 4, 1, 3);
+      rect(x, "#A47D4A", 3, 8, 1, 3);
+      rect(x, "#A47D4A", 13, 12, 1, 3);
+    },
+    carpetGray: function (x, tx, ty) {
+      rect(x, "#5E626A", 0, 0, 16, 16);
+      rect(x, "#686C74", (tx * 5 + ty * 3) % 14, (tx + ty * 7) % 14, 2, 1);
+      rect(x, "#555960", (tx * 3 + ty * 11) % 14, (tx * 7 + ty) % 14, 1, 2);
+    },
+    carpetGreen: function (x, tx, ty) {
+      rect(x, "#46705A", 0, 0, 16, 16);
+      rect(x, (tx + ty) % 2 ? "#4E7A63" : "#416A54", 2, 2, 12, 12);
+      rect(x, "#5A8A70", 7, 7, 2, 2);
+    },
+    carpetBlue: function (x, tx, ty) {
+      rect(x, "#2F4468", 0, 0, 16, 16);
+      rect(x, "#36507A", 0, (tx + ty) % 2 ? 0 : 8, 16, 1);
+      rect(x, "#283A5A", (tx * 5) % 16, (ty * 7) % 16, 1, 1);
+    },
+    lino: function (x, tx, ty) {
+      rect(x, (tx + ty) % 2 ? "#AEB5BD" : "#A6ADB6", 0, 0, 16, 16);
+    },
+    linoDark: function (x, tx, ty) {
+      rect(x, (tx + ty) % 2 ? "#6E747C" : "#666C74", 0, 0, 16, 16);
+      rect(x, "#5C6168", (tx * 7 + ty * 3) % 14, (tx * 3 + ty * 5) % 14, 2, 1);
+    },
+    tech: function (x, tx, ty) {
+      rect(x, "#3A4652", 0, 0, 16, 16);
+      rect(x, "#46525F", 0, 0, 16, 1);
+      rect(x, "#46525F", 0, 0, 1, 16);
+      if ((tx + ty) % 3 === 0) {
+        rect(x, "#4FA3C7", 7, 7, 2, 2);
+      }
+    },
+    raised: function (x) {
+      rect(x, "#2E3238", 0, 0, 16, 16);
+      rect(x, "#3A3F46", 1, 1, 14, 14);
+      rect(x, "#24282D", 3, 3, 2, 2);
+      rect(x, "#24282D", 11, 11, 2, 2);
+    },
+    marble: function (x, tx, ty) {
+      rect(x, "#DEDBD4", 0, 0, 16, 16);
+      rect(x, "#C9C5BC", 0, 0, 16, 1);
+      rect(x, "#C9C5BC", 0, 0, 1, 16);
+      rect(x, "#B9B4AA", (tx * 7 + ty * 3) % 12 + 2, 4, 1, 6);
+      rect(x, "#B9B4AA", (tx * 7 + ty * 3) % 12 + 3, 9, 3, 1);
+    },
+    wine: function (x, tx, ty) {
+      rect(x, "#6A2E33", 0, 0, 16, 16);
+      rect(x, (tx + ty) % 2 ? "#74353A" : "#5E282D", 4, 4, 8, 8);
+      rect(x, "#8A4A40", 7, 7, 2, 2);
+    },
+    checker: function (x, tx, ty) {
+      var a = (tx + ty) % 2 ? "#E9E3D6" : "#B8473F";
+      var b2 = (tx + ty) % 2 ? "#B8473F" : "#E9E3D6";
+      rect(x, a, 0, 0, 8, 8);
+      rect(x, b2, 8, 0, 8, 8);
+      rect(x, b2, 0, 8, 8, 8);
+      rect(x, a, 8, 8, 8, 8);
+    },
+    parquet: function (x, tx, ty) {
+      var flip = (tx + ty) % 2;
+      rect(x, "#5B3A24", 0, 0, 16, 16);
+      var i;
+      for (i = 0; i < 4; i++) {
+        if (flip) {
+          rect(x, i % 2 ? "#6A452B" : "#4E3220", i * 4, 0, 3, 16);
+        } else {
+          rect(x, i % 2 ? "#6A452B" : "#4E3220", 0, i * 4, 16, 3);
+        }
+      }
+    },
+    concrete: function (x, tx, ty) {
+      rect(x, "#5F5F5B", 0, 0, 16, 16);
+      rect(x, "#555551", (tx * 5 + ty * 9) % 13, (tx * 3 + ty * 5) % 13, 3, 1);
+      rect(x, "#4A4A46", (tx * 11 + ty * 3) % 14, (tx * 9 + ty * 7) % 14, 1, 3);
+    },
+    toiletPink: function (x) {
+      rect(x, "#EADCDC", 0, 0, 16, 16);
+      rect(x, "#D6C4C4", 0, 0, 16, 1);
+      rect(x, "#D6C4C4", 0, 0, 1, 16);
+      rect(x, "#D6C4C4", 8, 0, 1, 16);
+      rect(x, "#D6C4C4", 0, 8, 16, 1);
+    },
+    toiletBlue: function (x, tx, ty) {
+      rect(x, (tx + ty) % 2 ? "#B8CCDC" : "#E4EDF4", 0, 0, 16, 16);
+    },
+    toiletGreen: function (x, tx, ty) {
+      rect(x, "#8E9A86", 0, 0, 16, 16);
+      rect(x, "#7E8A76", 0, 0, 16, 1);
+      rect(x, "#7E8A76", 0, 0, 1, 16);
+      if ((tx * 3 + ty) % 5 === 0) {
+        rect(x, "#5E6A56", 5, 9, 4, 2);
+      }
+    }
+  };
+  function wallBase(x) {
+    rect(x, WALL[0], 0, 0, 16, 16);
+    rect(x, WALL[1], 0, 0, 16, 2);
+    rect(x, WALL[2], 0, 13, 16, 3);
+  }
+  var DRAW = {
+    "#": wallBase,
+    W: function (x) {
+      wallBase(x);
+      rect(x, "#4C5A68", 1, 2, 14, 10);
+      rect(x, "#141E38", 2, 3, 12, 8);
+      rect(x, "#F2D06B", 4, 8, 1, 1);
+      rect(x, "#F2D06B", 10, 6, 1, 1);
+      rect(x, "#9FB4D6", 12, 4, 1, 1);
+      rect(x, "#4C5A68", 8, 3, 1, 8);
+    },
+    B: function (x, tx, ty, m) {
+      wallBase(x);
+      rect(x, "#6E5236", 0, 2, 16, 11);
+      if (m.board === "chalk") {
+        rect(x, "#2F4A3A", 0, 3, 16, 9);
+        rect(x, "#C9D6CC", 2, 5, 7, 1);
+      } else if (m.id === "r401" || m.id === "r402") {
+        rect(x, "#10151C", 0, 3, 16, 9);
+        rect(x, "#39C5BB", 2, 5, 6, 1);
+        rect(x, "#6C8CFF", 2, 8, 9, 1);
+      } else {
+        rect(x, "#ECEFF2", 0, 3, 16, 9);
+        if (m.board === "notes") {
+          rect(x, "#F2D06B", 2, 4, 3, 3);
+          rect(x, "#E86FA6", 9, 6, 3, 3);
+        } else {
+          rect(x, tx % 3 === 0 ? "#2F6FDE" : "#6B7280", 2, 5, 9, 1);
+          rect(x, "#6B7280", 2, 8, 6, 1);
+        }
+      }
+    },
+    E: function (x) {
+      rect(x, "#6E4422", 0, 0, 16, 16);
+      rect(x, "#8B5A2B", 2, 1, 12, 15);
+      rect(x, "#F2C14E", 11, 8, 2, 2);
+    },
+    H: function (x) {
+      rect(x, "#4B4F57", 0, 0, 16, 16);
+      var i;
+      for (i = 0; i < 4; i++) {
+        rect(x, i % 2 ? "#6A6F79" : "#7E838D", 0, i * 4, 16, 3);
+      }
+      rect(x, "#E2574C", 6, 6, 4, 4);
+    },
+    U: function (x) {
+      rect(x, "#4B4F57", 0, 0, 16, 16);
+      var i;
+      for (i = 0; i < 4; i++) {
+        rect(x, i % 2 ? "#9EA3AD" : "#8A8F99", 0, i * 4, 16, 3);
+      }
+      rect(x, "#4CB872", 6, 6, 4, 4);
+    },
+    D: function (x) {
+      rect(x, "#6E4A27", 1, 3, 14, 10);
+      rect(x, "#A97845", 1, 2, 14, 9);
+      rect(x, "#C4925C", 1, 2, 14, 2);
+      rect(x, "#4A4F5A", 4, 5, 8, 4);
+      rect(x, "#5C6470", 5, 6, 6, 2);
+    },
+    T: function (x) {
+      rect(x, "#4E331B", 0, 3, 16, 11);
+      rect(x, "#7A5230", 0, 2, 16, 10);
+      rect(x, "#F4F1E8", 5, 4, 6, 4);
+    },
+    K: function (x) {
+      rect(x, "#6E4A27", 0, 7, 16, 8);
+      rect(x, "#A97845", 0, 7, 16, 5);
+      rect(x, "#1A1420", 3, 0, 10, 8);
+      rect(x, "#39C5BB", 4, 1, 8, 5);
+      rect(x, "#2B2B2B", 4, 9, 8, 2);
+    },
+    J: function (x) {
+      rect(x, "#3A3F48", 0, 6, 16, 9);
+      rect(x, "#58606C", 0, 6, 16, 3);
+      rect(x, "#14181E", 3, 0, 10, 7);
+      rect(x, "#4F8FD8", 4, 1, 8, 4);
+      rect(x, "#2B2B2B", 7, 7, 2, 1);
+    },
+    A: function (x, tx, ty) {
+      rect(x, "#14171C", 1, 0, 14, 16);
+      rect(x, "#22262D", 2, 1, 12, 14);
+      var i;
+      for (i = 0; i < 5; i++) {
+        rect(x, "#0C0E11", 3, 2 + i * 3, 10, 1);
+        rect(x, (tx + ty + i) % 3 ? "#30F080" : "#FFB020", 11, 3 + i * 3, 1, 1);
+      }
+    },
+    L: function (x) {
+      rect(x, "#6F849A", 2, 0, 12, 15);
+      rect(x, "#8EA3B8", 3, 1, 10, 13);
+      rect(x, "#3D4A57", 5, 3, 6, 1);
+      rect(x, "#3D4A57", 5, 5, 6, 1);
+      rect(x, "#3D4A57", 11, 8, 1, 3);
+    },
+    P: function (x, tx, ty, m) {
+      rect(x, "#A0522D", 4, 10, 8, 5);
+      var dead = m.id === "hall4";
+      rect(x, dead ? "#5A5A3A" : "#3E8E41", 3, 3, 10, 7);
+      rect(x, dead ? "#6E6A44" : "#5DB860", 5, 1, 4, 4);
+      rect(x, dead ? "#6E6A44" : "#5DB860", 9, 4, 3, 3);
+    },
+    V: function (x, tx) {
+      wallBase(x);
+      rect(x, "#7C858F", 0, 1, 16, 14);
+      rect(x, "#B3BCC6", tx % 2 ? 0 : 1, 2, 15, 13);
+      rect(x, "#7C858F", tx % 2 ? 0 : 15, 2, 1, 13);
+      rect(x, "#E2574C", tx % 2 ? 1 : 13, 0, 2, 1);
+    },
+    M: function (x) {
+      rect(x, "#B83227", 1, 0, 14, 15);
+      rect(x, "#F4E9D8", 3, 2, 10, 7);
+      rect(x, "#2B2B2B", 4, 3, 2, 2);
+      rect(x, "#4CB872", 7, 3, 2, 2);
+      rect(x, "#F2A93B", 10, 3, 2, 2);
+      rect(x, "#2B2B2B", 4, 11, 8, 2);
+    },
+    k: function (x) {
+      rect(x, "#2B2B30", 2, 0, 12, 15);
+      rect(x, "#4A4A52", 3, 1, 10, 5);
+      rect(x, "#E2574C", 5, 2, 2, 2);
+      rect(x, "#F4F1E8", 6, 9, 4, 3);
+    },
+    h: function (x) {
+      rect(x, "#6E5238", 0, 1, 16, 14);
+      rect(x, "#8E6F4E", 1, 2, 14, 3);
+      rect(x, "#8E6F4E", 1, 8, 14, 3);
+      rect(x, "#E2574C", 2, 5, 3, 3);
+      rect(x, "#F2D06B", 7, 5, 3, 3);
+      rect(x, "#4CB872", 11, 11, 3, 3);
+    },
+    b: function (x, tx, ty, m) {
+      var col = m.id === "l2" ? ["#4A2A2E", "#6E3A40"] : ["#6E5238", "#8E6F4E"];
+      rect(x, col[0], 1, 9, 14, 4);
+      rect(x, col[1], 1, 6, 14, 4);
+    },
+    O: function (x, tx, ty, m) {
+      var top = m.id === "caf20" ? "#2A2A30" : m.id === "caf10" ? "#F4F0E6" : "#D9C7A5";
+      var edge = m.id === "caf20" ? "#141418" : m.id === "caf10" ? "#B9B2A3" : "#A88F66";
+      rect(x, edge, 1, 3, 14, 11);
+      rect(x, top, 1, 2, 14, 10);
+      if (m.id === "caf20") {
+        rect(x, "#F2D06B", 7, 6, 2, 2);
+      }
+    },
+    r: function (x) {
+      rect(x, "#8A6A44", 1, 2, 14, 12);
+      rect(x, "#B08D62", 2, 3, 12, 9);
+    },
+    e: function (x) {
+      rect(x, "#3A2A1C", 0, 3, 16, 11);
+      rect(x, "#5B4230", 0, 2, 16, 10);
+      rect(x, "#F4F1E8", 6, 5, 4, 3);
+    },
+    R: function (x) {
+      rect(x, "#6F7982", 0, 2, 16, 13);
+      rect(x, "#A7B0B8", 0, 2, 16, 5);
+    },
+    N: function (x) {
+      rect(x, "#4E331B", 7, 9, 2, 6);
+      rect(x, "#2F6FDE", 2, 1, 12, 9);
+      rect(x, "#F4F1E8", 4, 3, 8, 1);
+      rect(x, "#F4F1E8", 4, 6, 6, 1);
+    },
+    S: function (x) {
+      wallBase(x);
+      rect(x, "#2F6FDE", 2, 3, 12, 8);
+      rect(x, "#F4F1E8", 4, 5, 8, 1);
+      rect(x, "#F4F1E8", 4, 8, 5, 1);
+    },
+    X: function (x) {
+      rect(x, "#5B4A3A", 2, 1, 12, 14);
+      rect(x, "#7A6450", 3, 2, 10, 5);
+      rect(x, "#7A6450", 3, 8, 10, 6);
+      rect(x, "#E0C068", 7, 4, 2, 1);
+      rect(x, "#E0C068", 7, 10, 2, 1);
+    },
+    F: function (x) {
+      wallBase(x);
+      rect(x, "#5B3A22", 0, 1, 16, 14);
+      rect(x, "#2F6FDE", 1, 2, 2, 5);
+      rect(x, "#E2574C", 3, 2, 2, 5);
+      rect(x, "#4CB872", 6, 2, 3, 5);
+      rect(x, "#F2A93B", 10, 2, 2, 5);
+      rect(x, "#9B6ADE", 2, 8, 3, 5);
+      rect(x, "#ECEFF2", 6, 8, 2, 5);
+      rect(x, "#2FB8B0", 9, 8, 4, 5);
+    },
+    Y: function (x) {
+      rect(x, "#8A9099", 1, 3, 14, 12);
+      rect(x, "#C9CED6", 1, 3, 14, 4);
+      rect(x, "#39C5BB", 10, 8, 3, 2);
+    },
+    Q: function (x) {
+      wallBase(x);
+      rect(x, "#4C5A68", 0, 3, 16, 9);
+      rect(x, "#0E1422", 1, 4, 14, 7);
+    },
+    G: function (x, tx) {
+      rect(x, "#3A4250", 0, 0, 16, 16);
+      rect(x, "#28344A", tx % 2 ? 0 : 1, 1, 15, 14);
+      rect(x, "#5F7FA8", tx % 2 ? 2 : 4, 3, 2, 8);
+      rect(x, "#C9CED6", tx % 2 ? 0 : 15, 1, 1, 14);
+      rect(x, "#E2574C", tx % 2 ? 3 : 11, 12, 2, 2);
+    },
+    C: function (x) {
+      rect(x, "#5E4024", 1, 2, 14, 13);
+      rect(x, "#8A6238", 2, 3, 12, 11);
+      rect(x, "#5E4024", 2, 8, 12, 1);
+      rect(x, "#5E4024", 7, 3, 1, 11);
+    },
+    Z: function (x) {
+      wallBase(x);
+      rect(x, "#4A5058", 1, 0, 14, 16);
+      rect(x, "#6A727C", 2, 1, 12, 15);
+      rect(x, "#111", 11, 6, 3, 4);
+      rect(x, "#FF2030", 12, 7, 1, 1);
+    },
+    z: function (x) {
+      rect(x, "#4A5058", 0, 0, 2, 16);
+      rect(x, "#4A5058", 14, 0, 2, 16);
+      rect(x, "#30F080", 12, 1, 1, 1);
+    },
+    I: function (x) {
+      wallBase(x);
+      rect(x, "#8A96A4", 1, 1, 14, 15);
+      rect(x, "#A8B4C2", 2, 2, 12, 13);
+      rect(x, "#E2574C", 11, 8, 2, 1);
+    },
+    n: function (x) {
+      wallBase(x);
+      rect(x, "#9FB4C6", 3, 1, 10, 7);
+      rect(x, "#C9D6E2", 4, 2, 4, 2);
+      rect(x, "#E8ECF0", 2, 9, 12, 4);
+      rect(x, "#8A96A4", 7, 8, 2, 2);
+    }
+  };
+  function renderLayer(m) {
+    WALL = m.wall;
+    var c = m.layer || document.createElement("canvas");
+    c.width = m.w * TS * SC;
+    c.height = m.h * TS * SC;
+    var x = c.getContext("2d");
+    var ty;
+    for (ty = 0; ty < m.h; ty++) {
+      var tx;
+      for (tx = 0; tx < m.w; tx++) {
+        var chr = m.rows[ty][tx];
+        x.setTransform(SC, 0, 0, SC, tx * TS * SC, ty * TS * SC);
+        if (ON_FLOOR[chr]) {
+          FLOORS[m.floor](x, tx, ty);
+        }
+        if (DRAW[chr]) {
+          DRAW[chr](x, tx, ty, m);
+        }
+      }
+    }
+    m.layer = c;
+  }
+  Object.keys(MAPS).forEach(function (id) {
+    var m = MAPS[id];
+    m.id = id;
+    m.h = m.rows.length;
+    m.w = m.rows[0].length;
+    renderLayer(m);
+  });
+  function setTile(m, x, y, ch2) {
+    var r = m.rows[y];
+    m.rows[y] = r.slice(0, x) + ch2 + r.slice(x + 1);
+    renderLayer(m);
+  }
+  function tileAt(m, x, y) {
+    if (y < 0 || y >= m.h || x < 0 || x >= m.w) {
+      return " ";
+    }
+    return m.rows[y][x];
+  }
+
+  /* ================= 인물 배치 (층마다 고루) ================= */
+  var PLACE = {
+    "박소영": ["r304", 7, 5, "up"], "이재준": ["r304", 11, 3, "up"], "조유현": ["r304", 15, 9, "up"],
+    "정민지": ["r303", 4, 2, "up"], "정재원": ["r303", 14, 5, "right"],
+    "이재원": ["r305", 4, 2, "left"], "권아영": ["r305", 14, 4, "up"],
+    "차주영": ["hall3", 8, 4, "down"], "최장현": ["hall3", 21, 1, "up"],
+    "이승우": ["t3", 8, 1, "up"],
+    "박재윤": ["hall4", 9, 2, "right"], "임형찬": ["hall4", 10, 2, "left"],
+    "송현우": ["r401", 3, 3, "up"], "방호준": ["r401", 9, 5, "up"],
+    "한범구": ["r402", 5, 1, "down"], "김민한": ["r402", 12, 4, "up"],
+    "정소연": ["server", 14, 4, "left"],
+    "김수진": ["l2", 12, 5, "down"],
+    "류선우": ["caf10", 2, 3, "up"], "김민수": ["caf10", 7, 3, "up"], "고민주": ["caf10", 11, 5, "up"],
+    "이승진": ["caf20", 14, 3, "up"], "박현모": ["caf20", 3, 5, "up"]
+  };
+  var NPCS = M.map(function (d) {
+    var p = PLACE[d.n];
+    return { kind: "mate", d: d, name: d.n, map: p[0], x: p[1], y: p[2], dir: p[3], home: p[3], sheet: SHEETS[d.n], turnAt: 0 };
+  });
+  var PRO = { kind: "pro", name: "박민희", map: "b1", x: 11, y: 10, dir: "up", home: "up", sheet: SHEETS["박민희"], turnAt: 0 };
+  var DOG = { kind: "dog", name: "똘이", map: "t2", x: 10, y: 2, dir: "left", home: "left", sheet: SHEETS["똘이"], turnAt: 0 };
+  NPCS.push(PRO);
+  NPCS.push(DOG);
+  function npcAt(map, x, y) {
+    var i;
+    for (i = 0; i < NPCS.length; i++) {
+      if (NPCS[i].map === map && NPCS[i].x === x && NPCS[i].y === y) {
+        return NPCS[i];
+      }
+    }
+    return null;
+  }
+
+  /* ================= 아이템 / 상태 ================= */
+  var ITEMS = {
+    note: ["Django 과외 노트", "정민지가 박소영에게 주기로 한 1:1 과외 노트."],
+    officeKey: ["강사실 열쇠", "CA 박소영이 맡아 둔 강사실 열쇠."],
+    elevKey: ["엘리베이터 키", "강사실 서랍장에서 찾은 엘리베이터 전원 키."],
+    card: ["소개글 카드", "7반 봇의 RAG DB를 복구할 반 친구 소개글 카드."],
+    coffee: ["무료 커피", "2층 라운지 커피 머신에서 뽑은 진한 커피."],
+    dog: ["똘이", "최장현의 반려견. 2층 화장실에서 떨고 있었다."],
+    pass: ["출입증", "정문을 여는 출입증. 반장 이승진이 맡아 두었다."],
+    coin: ["동전", "303호 교탁 서랍에서 찾은 동전."],
+    monster: ["몬스터", "3층 자판기에서 뽑은 에너지 음료."],
+    jelly: ["젤리", "20층 배식대 구석에서 찾은 젤리 한 봉지."],
+    pie: ["초코파이", "2층 라운지 간식 진열대에서 찾은 초코파이."],
+    book: ["삼국지 1권", "강사실 책장에 꽂혀 있던 삼국지."]
+  };
+  var CARD_FROM = ["송현우", "차주영", "류선우", "박현모", "최장현"];
+  var SKEY = "ssafy7-escape-v3";
+  function fresh() {
+    return {
+      map: "r304", x: 9, y: 11, dir: "up", inv: [], cards: {}, met: {},
+      f: { prologue: false, desk: false, soyoung: 0, minji2: 0, memoGate: false, memoB1: false, chase: false, keyTaken: false, botSeen: false, sohyeon: false, seungjin: 0, botFixed: false, b1hint: false, doorOpen: false, rescued: false, dogFound: false, coinTaken: false, jellyTaken: false, pieTaken: false, bookTaken: false, coffeeTaken: false, jaewon: 0, minju: 0, minsu: 0, boost: false, quiz30: false, chance: 0, hideMaster: false, saw4f: false, sawB1: false, toiletTip: false, allMet: false },
+      lore: {}, caught: 0, quizOk: 0, time: 0, ep: DEFAULT_EP
+    };
+  }
+  var st = fresh();
+  var CK = null;
+  var hasSave = false;
+  try {
+    var raw = localStorage.getItem(SKEY);
+    if (raw) {
+      var o = JSON.parse(raw);
+      if (o && o.ck) {
+        CK = o.ck;
+        hasSave = true;
+      }
+    }
+  } catch (e) {
+    /* 저장소를 쓸 수 없으면 이번 방문 동안만 */
+  }
+  function has(id) {
+    return st.inv.indexOf(id) >= 0;
+  }
+  function give(id) {
+    if (!has(id)) {
+      st.inv.push(id);
+    }
+    flash("획득: " + ITEMS[id][0], "item");
+    sfx("item");
+  }
+  function take(id) {
+    st.inv = st.inv.filter(function (x) { return x !== id; });
+  }
+  function cardsN() {
+    return CARD_FROM.filter(function (n) { return st.cards[n]; }).length;
+  }
+  function metCount() {
+    return M.filter(function (d) { return st.met[d.n]; }).length;
+  }
+  function applyWorld() {
+    var b1 = MAPS.b1;
+    var want = st.f.doorOpen ? "z" : "Z";
+    if (tileAt(b1, 11, 8) !== want) {
+      setTile(b1, 11, 8, want);
+    }
+    if (st.f.rescued) {
+      PRO.map = "lobby";
+      PRO.x = 12;
+      PRO.y = 5;
+      PRO.dir = PRO.home = "down";
+    } else {
+      PRO.map = "b1";
+      PRO.x = 11;
+      PRO.y = 10;
+      PRO.dir = PRO.home = "up";
+    }
+    if (st.cards["최장현"]) {
+      DOG.map = "hall3";
+      DOG.x = 22;
+      DOG.y = 2;
+      DOG.dir = DOG.home = "left";
+    } else if (st.f.dogFound) {
+      DOG.map = null;
+    } else {
+      DOG.map = "t2";
+      DOG.x = 10;
+      DOG.y = 2;
+    }
+  }
+  function checkpoint() {
+    st.map = P.map;
+    st.x = P.x;
+    st.y = P.y;
+    st.dir = P.dir;
+    CK = JSON.parse(JSON.stringify(st));
+    try {
+      localStorage.setItem(SKEY, JSON.stringify({ ck: CK }));
+    } catch (e) {
+      /* 무시 */
+    }
+  }
+  function objective() {
+    var f = st.f;
+    if (!f.desk) {
+      return "304호 교탁을 조사하자";
+    }
+    if (!has("officeKey") && !has("elevKey")) {
+      if (!f.soyoung) {
+        return "강사실 열쇠는 CA 박소영(304호)이 갖고 있을지도";
+      }
+      return has("note") ? "박소영(304호)에게 과외 노트를 전해 주자" : "303호 실습실의 정민지에게 과외 노트를 받아 오자";
+    }
+    if (!has("elevKey")) {
+      return "강사실(3층 복도 오른쪽)을 조사하자";
+    }
+    if (!f.botSeen) {
+      return "304호 컴퓨터의 7반 봇에게 B1 창고 비밀번호를 물어보자";
+    }
+    if (!f.seungjin) {
+      return f.sohyeon ? "20층 식당의 반장 이승진을 찾아가자" : "7반 봇 데이터가 깨졌다. 4층 서버실의 정소연에게 가 보자";
+    }
+    if (f.seungjin === 1) {
+      return cardsN() < CARD_FROM.length ? "소개글 카드 " + cardsN() + "/" + CARD_FROM.length + " · " + CARD_FROM.filter(function (n) { return !st.cards[n]; }).join("·") : "20층 식당의 이승진에게 카드를 전해 주자";
+    }
+    if (!f.b1hint) {
+      return "304호 7반 봇에게 박민희 프로님 메모를 물어보자 (B1 비밀번호)";
+    }
+    if (!f.doorOpen) {
+      return "B1 창고 도어락에 비밀번호를 입력하자 (엘리베이터 B1)";
+    }
+    if (!f.rescued) {
+      return "창고 안쪽의 박민희 프로님을 만나자";
+    }
+    if (!f.memoGate) {
+      return "7반 봇에게 정문 비밀번호 규칙(시설팀 공지)을 물어보자";
+    }
+    return "1층 로비에서 박민희 프로님과 함께 정문으로 탈출하자!";
+  }
+
+  /* ================= 플레이어 / 강사 ================= */
+  var P = { map: "r304", x: 9, y: 11, dir: "up", moving: false, fx: 0, fy: 0, t: 0, step: 0, hidden: false, entry: { x: 9, y: 11 } };
+  var TCH = { state: "off", map: null, x: 0, y: 0, fx: 0, fy: 0, t: 0, moving: false, dir: "down", at: 0, ex: 0, ey: 0, found: false, until: 0, farSince: 0, nextStep: 0, nextBeat: 0, nextGrowl: 0 };
+  var SCARE = null;
+  var state = "title";
+  var held = [];
+  var gt = 0;
+  var DV = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+  var OPP = { up: "down", down: "up", left: "right", right: "left" };
+  function hud() {
+    $("hud-loc").textContent = MAPS[P.map].name;
+    $("hud-att").textContent = "대화 " + metCount() + "/" + M.length;
+    $("hud-obj").textContent = "목표 · " + objective();
+  }
+  function walkableP(map, x, y) {
+    var c = tileAt(MAPS[map], x, y);
+    if (SOLID[c]) {
+      return false;
+    }
+    return !npcAt(map, x, y);
+  }
+  function walkableT(map, x, y) {
+    var c = tileAt(MAPS[map], x, y);
+    if (SOLID[c] || c === "E" || c === "H" || c === "U") {
+      return false;
+    }
+    if (npcAt(map, x, y)) {
+      return false;
+    }
+    if (P.hidden && P.map === map && P.x === x && P.y === y && !TCH.found) {
+      return false;
+    }
+    return true;
+  }
+
+  /* ================= 알림 / 연출 ================= */
+  var locT = null;
+  var alertT = null;
+  function showLoc(text, ms) {
+    var el = $("loc");
+    el.textContent = text || MAPS[P.map].name;
+    el.classList.add("on");
+    clearTimeout(locT);
+    locT = setTimeout(function () { el.classList.remove("on"); }, ms || 1400);
+  }
+  function chapter(text) {
+    showLoc(text, 2600);
+  }
+  function flash(text, kind) {
+    var el = $("alert");
+    el.textContent = text;
+    var col = kind === "danger" ? "#FF4D5E" : kind === "item" ? "#FFD25E" : "#B9C0E0";
+    el.style.color = col;
+    el.style.borderColor = col;
+    el.classList.add("on");
+    clearTimeout(alertT);
+    alertT = setTimeout(function () { el.classList.remove("on"); }, 1800);
+  }
+  var FX = { shakeUntil: 0, flickerUntil: 0 };
+  function shake(ms) {
+    FX.shakeUntil = gt + (ms || 500);
+  }
+  function flicker(ms) {
+    FX.flickerUntil = gt + (ms || 900);
+    sfx("flicker");
+  }
+
+  /* ================= 대화창 / 선택지 ================= */
+  var dlg = { pages: [], i: 0, shown: 0, full: "", typing: false, done: null };
+  function page(who, text, fx) {
+    return { who: who, text: text, fx: fx };
+  }
+  function narr(text, fx) {
+    return { who: null, text: text, fx: fx };
+  }
+  function setSpeaker(who) {
+    $("dlg-name").textContent = who || "";
+    $("dlg").classList.toggle("boss", who === "이자룡");
+    if (who && SHEETS[who]) {
+      $("dlg-face").hidden = false;
+      drawFace($("dlg-face-cv"), who);
+    } else {
+      $("dlg-face").hidden = true;
+    }
+  }
+  function say(pages, done) {
+    if (!pages.length) {
+      if (done) {
+        done();
+      }
+      return;
+    }
+    state = "dialog";
+    dlg.pages = pages;
+    dlg.i = 0;
+    dlg.done = done || null;
+    $("dlg").hidden = false;
+    showPage();
+  }
+  function showPage() {
+    var p = dlg.pages[dlg.i];
+    setSpeaker(p.who);
+    dlg.full = p.text;
+    dlg.shown = 0;
+    dlg.typing = true;
+    $("dlg-text").textContent = "";
+    $("dlg-more").hidden = true;
+    if (p.fx) {
+      p.fx();
+    }
+  }
+  function advance() {
+    if (dlg.typing) {
+      dlg.shown = dlg.full.length;
+      return;
+    }
+    dlg.i += 1;
+    if (dlg.i < dlg.pages.length) {
+      showPage();
+      return;
+    }
+    var cb = dlg.done;
+    dlg.done = null;
+    state = "play";
+    if (cb) {
+      cb();
+    }
+    if (state === "play") {
+      $("dlg").hidden = true;
+    }
+    hud();
+  }
+  function typeTick() {
+    if (state !== "dialog" || !dlg.typing) {
+      return;
+    }
+    dlg.shown = Math.min(dlg.full.length, dlg.shown + 1.6);
+    $("dlg-text").textContent = dlg.full.slice(0, Math.floor(dlg.shown));
+    if (dlg.shown >= dlg.full.length) {
+      dlg.typing = false;
+      $("dlg-text").textContent = dlg.full;
+      $("dlg-more").hidden = false;
+    }
+  }
+  var ch = { opts: [], sel: 0, cb: null };
+  function choose(who, prompt, opts, cb) {
+    state = "choice";
+    $("dlg").hidden = false;
+    setSpeaker(who);
+    $("dlg-text").textContent = prompt;
+    $("dlg-more").hidden = true;
+    ch.opts = opts;
+    ch.sel = 0;
+    ch.cb = cb;
+    renderChoice();
+    $("choice").hidden = false;
+  }
+  function renderChoice() {
+    $("choice-ul").innerHTML = ch.opts.map(function (o, i) {
+      return '<li data-c="' + i + '"' + (i === ch.sel ? ' class="sel"' : "") + ">" + esc(o) + "</li>";
+    }).join("");
+    var lis = $("choice-ul").querySelectorAll("li");
+    var i;
+    for (i = 0; i < lis.length; i++) {
+      lis[i].addEventListener("click", function (e) {
+        pick(Number(e.currentTarget.getAttribute("data-c")));
+      });
+    }
+  }
+  function pick(i) {
+    $("choice").hidden = true;
+    state = "play";
+    var cb = ch.cb;
+    ch.cb = null;
+    if (cb) {
+      cb(i);
+    }
+    if (state === "play") {
+      $("dlg").hidden = true;
+    }
+    hud();
+  }
+
+  /* ================= 반 친구 기본 대화 ================= */
+  function ageText(a) {
+    return a.replace(/^(\d+)/, "$1살");
+  }
+  function introPages(d) {
+    if (!d.intro) {
+      return [narr(d.n + "이(가) 말없이 앉아 있다."), narr("소개글을 쓰지 않아서 알려진 건 이것뿐이다."), narr(d.y + "년생 · " + d.maj.join(", ") + " 전공 · " + d.p + " 거주")];
+    }
+    var me = d.n;
+    var p = [];
+    if (d.role) {
+      p.push(page(me, "어? 너도 아직 안 갔어? 나는 " + d.n + ", 우리 반 " + jo(d.role, "이야", "야") + "."));
+    } else if (d.nick) {
+      p.push(page(me, "어? 너도 갇혔어? 나는 " + jo(d.nick, "이야", "야") + ". (본명 " + d.n + ")"));
+    } else {
+      p.push(page(me, "어? 너도 갇혔어? 나는 " + jo(d.n, "이야", "야") + "."));
+    }
+    var majStr = d.maj.length > 1 ? jo(d.maj[0], "이랑", "랑") + " " + d.maj[1] : d.maj[0];
+    p.push(page(me, d.y + "년생이고, 나이는 " + ageText(d.age) + ".\n전공은 " + jo(majStr, "이야", "야") + "."));
+    if (d.note) {
+      p.push(page(me, "나에 대해 하나 더 말하자면… " + d.note + "."));
+    }
+    if (d.mbti) {
+      p.push(page(me, "MBTI는 " + d.mbti + "야."));
+    }
+    return p;
+  }
+  function nowPages(d) {
+    var p = [];
+    if (d.now) {
+      p.push(page(d.n, "요즘 상태?\n\"" + d.now + "\""));
+    }
+    if (d.recent) {
+      p.push(page(d.n, "최근에 한 일은…\n\"" + d.recent + "\""));
+    }
+    return p.length ? p : [page(d.n, "음… 딱히 적은 게 없네.")];
+  }
+  function homePages(d) {
+    var p = [page(d.n, d.p + "에 살아.\n역삼까지 직선으로 " + d.k.toFixed(1) + "km 정도야.")];
+    var mates = M.filter(function (o) { return o.i !== d.i && o.p === d.p; }).map(function (o) { return o.n; });
+    if (mates.length) {
+      p.push(page(d.n, "같은 동네에 " + mates.join(", ") + "도 살아!"));
+    }
+    var far = M.slice().sort(function (a, b) { return b.k - a.k; });
+    if (far.indexOf(d) < 4) {
+      p.push(page(d.n, "우리 반에서 통학이 제일 먼 편이라 빨리 나가야 해…"));
+    }
+    return p;
+  }
+  function hobbyPages(d) {
+    if (!d.hob.length) {
+      return [page(d.n, "취미? 없음!")];
+    }
+    var p = [page(d.n, "취미는 " + d.hob.join(", ") + "!")];
+    var best = null;
+    d.hc.forEach(function (h) {
+      var others = (HOWN[h] ? HOWN[h].o : []).filter(function (i) { return i !== d.i; });
+      if (others.length && (!best || others.length > best.o.length)) {
+        best = { h: h, o: others };
+      }
+    });
+    if (best) {
+      p.push(page(d.n, "우리 반에 " + (HLABEL[best.h] || best.h) + " 좋아하는 사람이 또 있어.\n" + best.o.map(function (i) { return M[i].n; }).join(", ")));
+    }
+    return p;
+  }
+  function manittoPages(d) {
+    var p = [];
+    if (!d.guess) {
+      p.push(page(d.n, "마니또 추측은 안 적었어."));
+    } else if (d.guess === "비밀") {
+      p.push(page(d.n, "내 마니또 추측은… 비밀이야."));
+    } else if (d.guess.charAt(0) === "(") {
+      p.push(page(d.n, "내 마니또 추측은… " + d.guess));
+    } else {
+      p.push(page(d.n, "내 마니또 추측:\n\"" + d.guess + "\""));
+    }
+    if (d.gift === "비밀") {
+      p.push(page(d.n, "마니또한테 준 것도 비밀!"));
+    } else if (d.gift) {
+      p.push(page(d.n, "마니또한테는 '" + d.gift + "' 줬어."));
+    }
+    if (d.msg) {
+      p.push(page(d.n, "그리고 마니또에게 한마디.\n\"" + d.msg + "\""));
+    }
+    return p;
+  }
+
+  /* ================= 스토리 대사 ================= */
+  function cardGet(n, lines) {
+    st.cards[n] = true;
+    give("card");
+    checkpoint();
+    return lines.concat([narr("소개글 카드를 받았다! (" + cardsN() + "/" + CARD_FROM.length + ")")]);
+  }
+  function storyPages(d, npc) {
+    var n = d.n;
+    var f = st.f;
+    var quest = f.seungjin === 1 && !st.cards[n];
+    if (n === CLS.ca) {
+      if (!f.desk) {
+        return [page(n, "프로님 못 봤어? 아까 B1 내려가신다더니 안 오셔… 교탁에 뭐 적어 두신 것 같던데.")];
+      }
+      if (f.soyoung === 0) {
+        f.soyoung = 1;
+        return [page(n, "프로님이 B1에 가셨다고? 엘리베이터는 키가 있어야 움직일 텐데…"), page(n, "엘리베이터 키는 강사실에 있어. 강사실 열쇠는 CA라서 내가 갖고 있고."), page(n, "대신 부탁 하나만! 민지님한테 장고 1:1 과외 노트를 받기로 했거든. 303호 실습실에 계셔."), page(n, "노트 받아다 주면 열쇠 빌려줄게.")];
+      }
+      if (f.soyoung === 1 && has("note")) {
+        take("note");
+        f.soyoung = 2;
+        give("officeKey");
+        checkpoint();
+        chapter("제2장 · 강사실");
+        return [page(n, "노트다! 이제 장고 공부할 수 있겠다."), page(n, "약속한 강사실 열쇠야. 근데… 조심해. 아까부터 복도에서 이상한 발소리가 들려."), narr("강사실 열쇠를 얻었다!")];
+      }
+      if (f.soyoung === 1) {
+        return [page(n, "303호 실습실에 계신 민지님한테 과외 노트 받아 와 줘!")];
+      }
+      if (f.soyoung === 2) {
+        return [page(n, "강사님 만나면… 문제 낼 거야. 장고 복습해 둬.")];
+      }
+    }
+    if (n === "정민지") {
+      if (f.soyoung === 1 && !has("note") && !has("officeKey")) {
+        give("note");
+        checkpoint();
+        return [page(n, "소영이 노트? 여기. 장고 1:1 과외 노트야."), page(n, "나는 ADSP, 투운사, SQLD 공부… 를 미루는 중이야."), narr("Django 과외 노트를 얻었다!")];
+      }
+      if (f.minji2 === 0 && f.soyoung === 2) {
+        f.minji2 = 1;
+        return [page(n, "아, 부탁 하나만. 삼국지 1권을 강사실 책장에 두고 왔어."), page(n, "혹시 강사실 가게 되면 갖다줄래? 독서골든벨 금상 출신으로서 꼭 다시 읽어야 하거든.")];
+      }
+      if (f.minji2 === 1 && has("book")) {
+        take("book");
+        f.minji2 = 2;
+        f.hideMaster = true;
+        checkpoint();
+        return [page(n, "찾았구나! 고마워."), page(n, "보답으로 삼국지에서 배운 병법 하나. 숨을 땐 숨소리도 내지 말고 가만히 있어. 상대가 먼저 지쳐."), narr("숨기 요령을 배웠다! (사물함에서 덜 들키고, 강사님이 빨리 포기한다)")];
+      }
+      if (f.minji2 === 1) {
+        return [page(n, "강사실 책장에 삼국지 1권 있을 거야!")];
+      }
+    }
+    if (n === "이재준") {
+      if (!f.toiletTip) {
+        f.toiletTip = true;
+        return [page(n, "너 그거 알아? 나 자룡센세의 애착인형이잖아. 그래서 잘 알지."), page(n, "센세는 화장실엔 절대 안 들어와. 쫓기면 화장실로 튀어. 거기선 발소리가 멈출 거야."), narr("화장실은 강사님이 들어오지 않는 안전한 곳인 것 같다.")];
+      }
+    }
+    if (n === "조유현" && !f.chase) {
+      return [page(n, "나 지금 탈출 동선 기획 중이야."), page(n, "이 건물은 1층부터 4층까지 계단으로 이어지고, B1이랑 식당 층은 엘리베이터로만 갈 수 있어. 엘리베이터는 키가 있어야 움직여.")];
+    }
+    if (n === "정재원") {
+      return [page(n, "마니또? 추측이 아니라 알아버렸는데 안 말할래요."), page(n, "대신 하나 알려 줄게. 강사님은 멀리 떨어지면 금방 놓치시더라. 문 몇 개만 지나쳐도 포기하셔.")];
+    }
+    if (n === "이승우") {
+      return [page(n, "…(기도 중)"), page(n, "아, 깜짝이야. 기사시험 벼락치기하다 무서워서 여기 숨어 있었어."), page(n, "여기가 제일 안전해. 강사님 발소리가 화장실 앞에서 딱 멈추더라고.")];
+    }
+    if (n === "권아영" && f.chase) {
+      return [page(n, "condition nienzo… 열심히 살기 너무 힘들다."), page(n, "아 맞다, 사물함 있잖아. 강사님이 멀리 있을 때 들어가야 해. 가까이서 들어가면 다 보여.")];
+    }
+    if (n === "정소연") {
+      if (f.botSeen && !f.sohyeon) {
+        f.sohyeon = true;
+        checkpoint();
+        return [page(n, "7반 봇이 B1 비밀번호를 모른다고? 아… 오늘 저녁에 벡터 DB가 날아갔어."), page(n, "프로님이 봇한테 메모를 저장해 두셨다면 그 DB 안에 있었을 거야."), page(n, "다행히 반장 승진이가 RAG DB 재료를 모으고 있었어. 승진이한테 가면 복구할 수 있을걸? 20층 식당에 있을 거야."), narr("이승진을 찾아 20층 식당으로 가자.")];
+      }
+      if (f.botFixed) {
+        return [page(n, "복구하다 보니 이상한 게 있어. 반 친구 소개글 말고 시설팀 일지, 경비실 기록 같은 문서도 같이 들어가 있더라."), page(n, "그리고 DB가 왜 날아갔는지 장애 보고서도 써서 넣어 뒀어. 봇한테 '서버 장애'라고 물어봐.")];
+      }
+      return [page(n, "RAG 프로젝트 하다가 이 시간이 됐네… 어제 저녁은 지삼선이랑 홍소육이었는데.")];
+    }
+    if ((n === "한범구" || n === "김민한") && f.botSeen && !f.botFixed) {
+      return [page(n, n === "한범구" ? "7반 봇? GMS로 돌아가는 RAG 챗봇이야. 나 오늘 AI 토큰 다 녹였어." : "RAG는 검색할 문서가 없으면 아무것도 못 해. DB부터 살려야 돼.")];
+    }
+    if (n === CLS.leader) {
+      if (!f.botSeen) {
+        return [page(n, "반장인데 아직도 못 갔어… RAG DB 어떻게 모을지 고민하다 보니 이 시간이야.")];
+      }
+      if (f.seungjin === 0) {
+        f.seungjin = 1;
+        checkpoint();
+        chapter("제3장 · 7반 봇 복구");
+        return [page(n, "봇 DB가 날아갔다고? 내가 RAG DB 재료로 소개글 카드를 모으던 중이었어."), page(n, "아직 못 받은 카드가 5장 있어. 송현우, 차주영, 류선우, 박현모, 최장현."), page(n, "카드만 모아 오면 내가 바로 DB 복구할게. 그리고 정문 출입증도 반장인 내가 맡아 두고 있으니까 같이 줄게.")];
+      }
+      if (f.seungjin === 1 && cardsN() >= CARD_FROM.length) {
+        f.seungjin = 2;
+        f.botFixed = true;
+        take("card");
+        give("pass");
+        checkpoint();
+        return [page(n, "5장 전부! 지금 바로 임베딩 다시 돌릴게…"), narr("이승진이 노트북을 두드린다. 화면에 '벡터 DB 복구 완료'가 떴다."), page(n, "됐다! 304호 7반 봇한테 다시 물어봐. 그리고 이건 약속한 출입증."), narr("출입증을 얻었다!")];
+      }
+      if (f.seungjin === 1) {
+        return [page(n, "카드 " + cardsN() + "/" + CARD_FROM.length + "장. " + CARD_FROM.filter(function (x) { return !st.cards[x]; }).join(", ") + "한테 받아 와 줘!")];
+      }
+    }
+    if (n === "송현우" && quest) {
+      var ans = M.filter(function (o) { return o.maj.indexOf("전자공학") >= 0; })[0];
+      return { ask: true, run: function (done) {
+        say([page(n, "소개글 카드? 줄게. 나도 사람들 학과랑 프로젝트 경험 모으고 싶었거든."), page(n, "대신 하나만 맞혀 봐. 나는 전기전자공학인데, 우리 반에 '전자공학' 전공한 사람은 누구게?")], function () {
+          var opts = shuffle([ans.n, "김민수", "정재원", CLS.ca]);
+          choose(n, "전자공학 전공자는?", opts.concat(["잘 모르겠어"]), function (i) {
+            if (opts[i] === ans.n) {
+              say(cardGet(n, [page(n, "정답! " + ans.n + "! 역시 다 알고 있구나.")]), done);
+            } else {
+              say([page(n, "음, 아닌 것 같은데? 반 친구들한테 물어보면 알 거야.")], done);
+            }
+          });
+        });
+      } };
+    }
+    if (n === "차주영" && quest) {
+      var minju = NPCS.filter(function (x) { return x.name === "고민주"; })[0];
+      var where = MAPS[minju.map].name;
+      return { ask: true, run: function (done) {
+        say([page(n, "카드? 줄게! 닉네임은 '민주동생'으로 써 줘."), page(n, "근데 민주 언니 어디 갔는지 알아? 100퍼센트 내 마니또라니까. 빨리 잡아내야 해.")], function () {
+          var opts = shuffle([where, "2층 라운지", "4층 서버실", "B1 창고"]);
+          choose(n, "고민주는 어디 있을까?", opts, function (i) {
+            if (opts[i] === where) {
+              say(cardGet(n, [page(n, where + "! 거기 있었구나. 고마워, 민주동생의 카드 받아!")]), done);
+            } else {
+              say([page(n, "거기 없던데… 다시 찾아봐 줘!")], done);
+            }
+          });
+        });
+      } };
+    }
+    if (n === "류선우" && quest) {
+      if (has("coffee")) {
+        take("coffee");
+        return cardGet(n, [page(n, "커피다… 살았다. 이제 눈이 떠져."), page(n, "카드 여기. 응용통계학 류선우, 취미는 없음.")]);
+      }
+      return [page(n, "카드…? 줄게. 근데 너무 잠 와서 손이 안 움직여…"), page(n, "커피 한 잔만… 2층 라운지에 무료 커피 머신 있었는데.")];
+    }
+    if (n === "박현모" && quest) {
+      return { ask: true, run: function (done) {
+        var q = QUIZ[Math.floor(Math.random() * QUIZ.length)];
+        var order = shuffle([0, 1, 2, 3]);
+        var opts = order.map(function (k) { return q[1][k]; });
+        say([page(n, "카드? 줄게. 근데 큰일났다, 진짜 쟝고 드럽게 어렵다…"), page(n, "이거 하나만 알려 줘. 맞으면 카드 줄게!")], function () {
+          choose(n, "Q. " + q[0], opts, function (i) {
+            if (opts[i] === q[1][q[2]]) {
+              say(cardGet(n, [page(n, "아 그렇구나! " + q[3]), page(n, "고마워, 카드 여기!")]), done);
+            } else {
+              say([page(n, "어… 그거 아닌 것 같은데. 다시 생각해 보고 와 줘.")], done);
+            }
+          });
+        });
+      } };
+    }
+    if (n === "최장현") {
+      if (st.cards["최장현"]) {
+        return [page(n, "똘이야, 이제 무서운 데 가지 마.")];
+      }
+      if (has("dog")) {
+        take("dog");
+        var lines = [page(n, "똘이야!!"), narr("똘이가 꼬리를 흔들며 최장현에게 달려간다.", function () { sfx("bark"); }), page(n, "산책시키다가 놓쳤는데… 진짜 고마워.")];
+        if (quest || f.seungjin !== 2) {
+          st.cards["최장현"] = true;
+          lines.push(page(n, "승진이가 카드 모은다고 했지? 내 거 가져가."));
+          give("card");
+          lines.push(narr("소개글 카드를 받았다! (" + cardsN() + "/" + CARD_FROM.length + ")"));
+        }
+        checkpoint();
+        return { ask: true, run: function (done) {
+          say(lines, function () {
+            applyWorld();
+            done();
+          });
+        } };
+      }
+      return [page(n, "멍 때리고 있는 거 아니야… 똘이 산책시키다 놓쳤어."), page(n, "아까 2층 어디선가 낑낑대는 소리가 났는데… 화장실 쪽이었나?")];
+    }
+    if (n === "이재원") {
+      if (f.jaewon === 0) {
+        f.jaewon = 1;
+        return [page(n, "DB 생성 고민하느라 머리가 안 돌아가…"), page(n, "몬스터 하나만 있으면 살 것 같은데. 3층 복도 자판기에 있을 거야.")];
+      }
+      if (f.jaewon === 1 && has("monster")) {
+        take("monster");
+        f.jaewon = 2;
+        f.boost = true;
+        checkpoint();
+        return [page(n, "살았다! 고마워."), page(n, "두 캔 사 놨던 게 있는데 하나는 너 마셔. 도망칠 때 힘 좀 날 거야."), narr("에너지 충전! 이동 속도가 빨라졌다.")];
+      }
+      if (f.jaewon === 1) {
+        return [page(n, "몬스터… 3층 자판기에…")];
+      }
+    }
+    if (n === "고민주") {
+      if (f.minju === 0) {
+        f.minju = 1;
+        return [page(n, "제일 좋아하는 젤리를 다 먹어 버렸어… 흑흑."), page(n, "20층 식당 배식대에 남은 거 없으려나?")];
+      }
+      if (f.minju === 1 && has("jelly")) {
+        take("jelly");
+        f.minju = 2;
+        f.quiz30 = true;
+        checkpoint();
+        return [page(n, "이거야! 다 겁나 맘에 들어, 고마워!"), page(n, "반은 너 먹어. 당 충전하면 머리가 팽팽 돌걸?"), narr("당 충전! 강사님 퀴즈 제한 시간이 20초에서 30초로 늘었다.")];
+      }
+      if (f.minju === 1) {
+        return [page(n, "20층 배식대에 젤리 남았으려나…")];
+      }
+    }
+    if (n === "김민수") {
+      if (f.minsu === 0) {
+        f.minsu = 1;
+        return [page(n, "아까 초코파이 먹었는데 또 먹고 싶다…"), page(n, "2층 라운지 간식 진열대에 하나 남아 있던 것 같던데.")];
+      }
+      if (f.minsu === 1 && has("pie")) {
+        take("pie");
+        f.minsu = 2;
+        f.chance += 2;
+        checkpoint();
+        return [page(n, "오, 초코파이! 고마워."), page(n, "대신 이거. 알고리즘 공부하면서 만든 찍기 비법 노트야. 두 번까지 쓸 수 있어."), narr("50:50 찬스 2회를 얻었다! (강사님 퀴즈에서 오답 2개를 지운다)")];
+      }
+      if (f.minsu === 1) {
+        return [page(n, "2층 간식 진열대에 초코파이…")];
+      }
+    }
+    if ((n === "박재윤" || n === "임형찬") && !f.chase) {
+      return [page(n, n === "박재윤" ? "형찬님이랑 운동하다가 늦었어. 근데 아까 4층 복도 끝에 누가 서 있던데… 키가 엄청 컸어." : "재윤님 말 맞아. 복도 끝에서 뭔가 우릴 보고 있었어. 강사님이었나…?")];
+    }
+    if (n === "김수진") {
+      return [page(n, "심심해서 라운지에 있었어. 저 커피 머신 무료야, 마셔도 돼."), page(n, "간식 진열대에도 뭐 남아 있을걸?")];
+    }
+    return null;
+  }
+
+  var ASK = ["요즘 뭐 해?", "어디 살아?", "취미가 뭐야?", "마니또 얘기", "잘 가!"];
+  function mateMenu(npc) {
+    var d = npc.d;
+    choose(d.n, "뭐 궁금한 거 있어?", ASK, function (i) {
+      if (i === 4) {
+        npc.dir = npc.home;
+        afterTalk();
+        return;
+      }
+      say([nowPages, homePages, hobbyPages, manittoPages][i](d), function () { mateMenu(npc); });
+    });
+  }
+  function talkMate(npc) {
+    var d = npc.d;
+    var first = !st.met[d.n];
+    var pages = first ? introPages(d) : [];
+    var sp = storyPages(d, npc);
+    var finish = function () {
+      st.met[d.n] = true;
+      hud();
+      if (d.intro) {
+        mateMenu(npc);
+      } else {
+        npc.dir = npc.home;
+        afterTalk();
+      }
+    };
+    if (sp && sp.ask) {
+      say(pages, function () {
+        st.met[d.n] = true;
+        sp.run(finish);
+      });
+      return;
+    }
+    if (sp) {
+      pages = pages.concat(sp);
+    }
+    if (!pages.length) {
+      pages = [page(d.n, d.intro ? "왜? 뭐 궁금한 거 있어?" : "…")];
+    }
+    say(pages, finish);
+  }
+  function afterTalk() {
+    if (!st.f.allMet && metCount() >= M.length) {
+      st.f.allMet = true;
+      say([narr("반 친구 " + M.length + "명 모두와 이야기를 나눴다!")]);
+    }
+  }
+  function talkDog() {
+    st.f.dogFound = true;
+    DOG.map = null;
+    give("dog");
+    checkpoint();
+    say([narr("세면대 아래에서 작은 강아지가 떨고 있다.", function () { sfx("bark"); }), narr("목걸이에 '똘이'라고 적혀 있다. 최장현의 반려견인 것 같다."), narr("똘이를 품에 안았다.")]);
+  }
+  function talkPro() {
+    if (!st.f.rescued) {
+      st.f.rescued = true;
+      checkpoint();
+      say([
+        page("박민희", "…누구세요? 아, 7반 학생이구나. 살았다…!"),
+        page("박민희", "B1 창고 점검하러 내려왔다가 도어락이 고장 나서 갇혀 버렸어요. 비밀번호는 혹시 몰라 7반 봇에 저장해 뒀었는데…"),
+        page("박민희", "봇 DB까지 복구해서 찾아왔다고요? 반 친구들 도움 많이 받았겠네요. 정말 고마워요."),
+        page("박민희", "그런데 아까부터 이자룡 강사님이 이상해요. 계속 '과제 검사'만 중얼거리면서 건물을 돌고 계세요…", function () { flicker(1200); }),
+        page("박민희", "저는 먼저 1층 로비로 갈게요. 정문은 출입증이랑 비밀번호가 있어야 열려요. 로비에서 만나요!"),
+        narr("박민희 프로님을 구출했다!")
+      ], function () {
+        applyWorld();
+        sfx("good");
+        chapter("제4장 · 탈출");
+        if (st.f.chase) {
+          TCH.state = "enter";
+          TCH.map = "b1";
+          TCH.ex = 11;
+          TCH.ey = 1;
+          TCH.at = gt + 4500;
+          say([narr("…위층에서 엘리베이터가 내려오는 소리가 들린다.", function () { sfx("elev"); }), page("이자룡", "거기 누고! B1까지 내려왔나?! 퍼뜩 안 올라오나!")]);
+        }
+        hud();
+      });
+      return;
+    }
+    if (!has("pass")) {
+      say([page("박민희", "출입증은 반장 이승진 학생이 맡아 두었을 거예요.")]);
+    } else if (!st.f.memoGate) {
+      say([page("박민희", "정문 비밀번호 규칙은 시설팀 공지에 있어요. 그 공지도 7반 봇 DB에 올라가 있을 거예요.")]);
+    } else {
+      say([page("박민희", "규칙대로 반장이랑 CA가 몇 년생인지만 알면 돼요. 모르면 7반 봇한테 물어봐요!")]);
+    }
+  }
+
+  /* ================= 강사 추격 ================= */
+  var LINES_APPEAR = ["어데 가노! 거 서 봐라!", "니 거기 서라, 마!", "이 시간까지 머하노?! 퍼뜩 온나!", "어디 숨었노? 다 보인데이…", "과제… 과제 검사한데이…"];
+  var LINES_LOST = ["…어데 갔노? 쪼매난 기 빠르네.", "…놓쳤뿟네. 다음엔 안 봐준데이.", "…어디 갔노 이것들이."];
+  function startChase() {
+    st.f.chase = true;
+    TCH.state = "enter";
+    TCH.map = "office";
+    TCH.ex = 9;
+    TCH.ey = 7;
+    TCH.at = gt + 2500;
+    TCH.found = false;
+    TCH.farSince = 0;
+  }
+  function loseTeacher(silent) {
+    TCH.state = "away";
+    TCH.moving = false;
+    TCH.at = gt + 22000 + Math.random() * 12000;
+    TCH.farSince = 0;
+    if (!silent) {
+      flash("이자룡: " + rand(LINES_LOST), "danger");
+      sfx("lost");
+    }
+  }
+  function bfs(map, sx, sy, tx, ty) {
+    var m = MAPS[map];
+    var W = m.w;
+    var prev = new Int32Array(m.w * m.h).fill(-2);
+    var start = sy * W + sx;
+    var goal = ty * W + tx;
+    var q = [start];
+    prev[start] = -1;
+    var head = 0;
+    while (head < q.length) {
+      var cur = q[head];
+      head += 1;
+      if (cur === goal) {
+        break;
+      }
+      var cx = cur % W;
+      var cy = Math.floor(cur / W);
+      var k;
+      for (k = 0; k < 4; k++) {
+        var dv = DV[DIRS[k]];
+        var nx = cx + dv[0];
+        var ny = cy + dv[1];
+        if (nx < 0 || ny < 0 || nx >= m.w || ny >= m.h) {
+          continue;
+        }
+        var ni = ny * W + nx;
+        if (prev[ni] !== -2) {
+          continue;
+        }
+        if (ni !== goal && !walkableT(map, nx, ny)) {
+          continue;
+        }
+        prev[ni] = cur;
+        q.push(ni);
+      }
+    }
+    if (prev[goal] === -2 || goal === start) {
+      return null;
+    }
+    var len = 1;
+    var stp = goal;
+    while (prev[stp] !== start) {
+      stp = prev[stp];
+      len += 1;
+    }
+    return { x: stp % W, y: Math.floor(stp / W), len: len };
+  }
+  function teacherFollow(fromMap, exX, exY, arrMap, ax, ay, viaElevator) {
+    if (!st.f.chase) {
+      return;
+    }
+    if (MAPS[arrMap].safe) {
+      if ((TCH.state === "chase" || TCH.state === "search" || TCH.state === "enter") && (TCH.map === fromMap || TCH.state === "enter")) {
+        loseTeacher(true);
+        TCH.map = arrMap;
+        setTimeout(function () {
+          if (P.map === arrMap) {
+            flash("…발소리가 화장실 앞에서 멈췄다.", "info");
+          }
+        }, 1400);
+      }
+      return;
+    }
+    if (TCH.state === "chase" || TCH.state === "search") {
+      if (TCH.map !== fromMap) {
+        return;
+      }
+      var r = bfs(fromMap, TCH.x, TCH.y, exX, exY);
+      var d = r ? r.len : 99;
+      if (d > FOLLOW_MAX || TCH.state === "search") {
+        loseTeacher(true);
+        TCH.map = arrMap;
+        return;
+      }
+      TCH.state = "enter";
+      TCH.map = arrMap;
+      TCH.ex = ax;
+      TCH.ey = ay;
+      TCH.at = gt + 1200 + d * 240 + (viaElevator ? 2500 : 0);
+      TCH.moving = false;
+      return;
+    }
+    if (TCH.state === "enter") {
+      TCH.map = arrMap;
+      TCH.ex = ax;
+      TCH.ey = ay;
+      TCH.at = Math.max(TCH.at, gt) + 1800 + (viaElevator ? 2500 : 0);
+    }
+  }
+  function awaySpawn() {
+    var sp = MAPS[P.map].spawns.slice().sort(function (a, b) {
+      return (Math.abs(b[0] - P.x) + Math.abs(b[1] - P.y)) - (Math.abs(a[0] - P.x) + Math.abs(a[1] - P.y));
+    });
+    return sp[0];
+  }
+  function tStep(nx, ny) {
+    var dx = nx - TCH.x;
+    var dy = ny - TCH.y;
+    TCH.dir = dx > 0 ? "right" : dx < 0 ? "left" : dy > 0 ? "down" : "up";
+    if (nx === P.x && ny === P.y && !P.hidden) {
+      caught();
+      return;
+    }
+    TCH.fx = nx;
+    TCH.fy = ny;
+    TCH.moving = true;
+    TCH.t = 0;
+    var dist = Math.abs(TCH.x - P.x) + Math.abs(TCH.y - P.y);
+    stepBoss(Math.max(0.12, 1.15 - dist * 0.07), (TCH.x - P.x) / 8);
+  }
+  function teacherUpdate() {
+    if (TCH.state === "off") {
+      return;
+    }
+    if (TCH.state === "enter" || TCH.state === "away") {
+      if (MAPS[P.map].safe) {
+        if (TCH.state === "enter") {
+          loseTeacher(true);
+        }
+        TCH.at = Math.max(TCH.at, gt + 4000);
+        return;
+      }
+      if (TCH.state === "away" && TCH.map !== P.map) {
+        TCH.map = P.map;
+      }
+      if (TCH.map === P.map) {
+        var left = TCH.at - gt;
+        if (left < 3000 && left > 0 && gt > TCH.nextStep) {
+          TCH.nextStep = gt + 200 + (left / 3000) * 260;
+          stepBoss(0.12 + (1 - left / 3000) * 0.6, 0);
+        }
+      }
+      if (gt >= TCH.at && TCH.map === P.map) {
+        if (TCH.state === "away") {
+          var sp = awaySpawn();
+          if (!sp) {
+            TCH.at = gt + 4000;
+            return;
+          }
+          TCH.ex = sp[0];
+          TCH.ey = sp[1];
+        }
+        TCH.x = TCH.ex;
+        TCH.y = TCH.ey;
+        TCH.moving = false;
+        TCH.found = false;
+        TCH.farSince = 0;
+        if (P.x === TCH.x && P.y === TCH.y && !P.hidden) {
+          caught();
+          return;
+        }
+        if (npcAt(P.map, TCH.x, TCH.y) || (P.hidden && P.x === TCH.x && P.y === TCH.y)) {
+          var side = DIRS.map(function (k) { return { x: TCH.x + DV[k][0], y: TCH.y + DV[k][1] }; }).filter(function (c) { return walkableT(P.map, c.x, c.y); });
+          if (!side.length) {
+            TCH.at = gt + 1000;
+            return;
+          }
+          TCH.x = side[0].x;
+          TCH.y = side[0].y;
+        }
+        TCH.state = P.hidden ? "search" : "chase";
+        TCH.until = gt + (st.f.hideMaster ? 3000 : 6000);
+        flash("이자룡: " + rand(LINES_APPEAR), "danger");
+        sfx("stinger");
+        shake(500);
+      }
+      return;
+    }
+    if (TCH.map !== P.map) {
+      return;
+    }
+    if (TCH.moving) {
+      var prevTT = TCH.t;
+      TCH.t += T_SPEED;
+      if (TCH.state === "chase" && prevTT < TS / 2 && TCH.t >= TS / 2) {
+        var dHalf = Math.abs(TCH.fx - P.x) + Math.abs(TCH.fy - P.y);
+        stepBoss(Math.max(0.1, 0.95 - dHalf * 0.06), (TCH.fx - P.x) / 8, true);
+      }
+      if (TCH.t >= TS) {
+        TCH.x = TCH.fx;
+        TCH.y = TCH.fy;
+        TCH.moving = false;
+        TCH.t = 0;
+      }
+    }
+    if (!TCH.moving) {
+      if (TCH.state === "chase" && P.hidden && !TCH.found) {
+        TCH.state = "search";
+        TCH.until = gt + (st.f.hideMaster ? 3000 : 6000);
+      }
+      if (TCH.state === "search" && !P.hidden) {
+        TCH.state = "chase";
+        TCH.farSince = 0;
+      }
+      if (TCH.state === "search" && gt > TCH.until) {
+        loseTeacher(false);
+        return;
+      }
+      var dist = Math.abs(TCH.x - P.x) + Math.abs(TCH.y - P.y);
+      if (P.hidden && TCH.found && dist <= 1) {
+        caught();
+        return;
+      }
+      var nxt = null;
+      if (TCH.state === "chase") {
+        nxt = bfs(P.map, TCH.x, TCH.y, P.x, P.y);
+        var len = nxt ? nxt.len : 99;
+        if (len > LOSE_DIST && !P.hidden) {
+          if (!TCH.farSince) {
+            TCH.farSince = gt;
+          } else if (gt - TCH.farSince > LOSE_MS) {
+            loseTeacher(false);
+            return;
+          }
+        } else {
+          TCH.farSince = 0;
+        }
+      }
+      if (!nxt) {
+        var opts = DIRS.map(function (k) { return { x: TCH.x + DV[k][0], y: TCH.y + DV[k][1] }; }).filter(function (c) { return walkableT(P.map, c.x, c.y) && !(c.x === P.x && c.y === P.y); });
+        if (opts.length && Math.random() < 0.5) {
+          nxt = rand(opts);
+        }
+      }
+      if (nxt) {
+        tStep(nxt.x, nxt.y);
+      }
+    }
+    var dd = Math.abs(TCH.x - P.x) + Math.abs(TCH.y - P.y);
+    if (dd <= 6 && gt > TCH.nextGrowl) {
+      TCH.nextGrowl = gt + 1500 + Math.random() * 900;
+      growl(0.5 - dd * 0.06, (TCH.x - P.x) / 8);
+    }
+    if (state === "play" && !P.hidden && TCH.state === "chase") {
+      var tx = TCH.moving ? TCH.x + (TCH.fx - TCH.x) * TCH.t / TS : TCH.x;
+      var ty = TCH.moving ? TCH.y + (TCH.fy - TCH.y) * TCH.t / TS : TCH.y;
+      var px = P.moving ? P.x + (P.fx - P.x) * P.t / TS : P.x;
+      var py = P.moving ? P.y + (P.fy - P.y) * P.t / TS : P.y;
+      if (Math.abs(tx - px) + Math.abs(ty - py) < 0.7) {
+        caught();
+        return;
+      }
+      if (dd <= 7 && gt > TCH.nextBeat) {
+        TCH.nextBeat = gt + 280 + dd * 110;
+        heartbeat(0.3 - dd * 0.03);
+      }
+    }
+  }
+  function teacherVisible() {
+    return TCH.map === P.map && (TCH.state === "chase" || TCH.state === "search");
+  }
+
+  /* ================= 잡혔을 때: Django 퀴즈 ================= */
+  var QUIZ = [
+    ["앱(app)을 새로 만드는 명령어는?", ["python manage.py startapp articles", "django-admin startproject articles", "python manage.py createapp articles", "python manage.py runapp articles"], 0, "앱은 manage.py의 startapp으로 만들고, startproject는 프로젝트를 만들 때 씁니다."],
+    ["앱을 만든 뒤 프로젝트에 등록하려면 settings.py의 어디에 추가할까?", ["INSTALLED_APPS", "MIDDLEWARE", "TEMPLATES", "DATABASES"], 0, "앱 이름은 INSTALLED_APPS 리스트에 추가합니다."],
+    ["models.py를 고친 뒤 DB에 반영하는 올바른 순서는?", ["makemigrations → migrate", "migrate → makemigrations", "runserver → migrate", "sqlmigrate → makemigrations"], 0, "makemigrations로 설계도(마이그레이션 파일)를 만들고 migrate로 DB에 반영합니다."],
+    ["게시글 본문처럼 길이 제한 없는 긴 글에 알맞은 필드는?", ["models.TextField()", "models.CharField()", "models.IntegerField()", "models.BooleanField()"], 0, "CharField는 max_length가 필요한 짧은 문자열용이고, 긴 본문은 TextField를 씁니다."],
+    ["models.CharField에 반드시 필요한 인자는?", ["max_length", "auto_now", "null", "default"], 0, "CharField는 max_length를 꼭 지정해야 합니다."],
+    ["글이 처음 생성될 때의 시각만 자동 저장하려면?", ["DateTimeField(auto_now_add=True)", "DateTimeField(auto_now=True)", "DateTimeField(default=None)", "DateTimeField(blank=True)"], 0, "auto_now_add는 생성 시 한 번, auto_now는 저장할 때마다 시각을 갱신합니다."],
+    ["Article의 모든 글을 가져오는 ORM 코드는?", ["Article.objects.all()", "Article.all()", "Article.objects.get()", "Article.query.all()"], 0, "모델 매니저 objects를 거쳐 all()을 호출합니다."],
+    ["pk가 1인 글을 가져오되, 없으면 404를 띄우려면?", ["get_object_or_404(Article, pk=1)", "Article.objects.filter(pk=1)", "Article.objects.all()[1]", "Article.get(1)"], 0, "get_object_or_404는 객체가 없으면 Http404를 발생시킵니다."],
+    ["Article.objects.get(pk=999)에서 해당 글이 없으면?", ["DoesNotExist 예외가 발생한다", "None을 반환한다", "빈 QuerySet을 반환한다", "첫 번째 글을 반환한다"], 0, "get()은 결과가 없으면 DoesNotExist, 여러 개면 MultipleObjectsReturned 예외가 납니다."],
+    ["Article.objects.filter(title='안녕')의 반환값은?", ["QuerySet", "Article 객체 하나", "딕셔너리 리스트", "True 또는 False"], 0, "filter()는 조건에 맞는 객체들을 QuerySet으로 돌려줍니다(없으면 빈 QuerySet)."],
+    ["글 목록을 최신순(pk 내림차순)으로 정렬하려면?", ["Article.objects.order_by('-pk')", "Article.objects.order_by('pk')", "Article.objects.sort('-pk')", "Article.objects.reverse_by('pk')"], 0, "order_by에 '-'를 붙이면 내림차순입니다."],
+    ["글을 만들고 바로 저장까지 한 번에 하는 ORM 코드는?", ["Article.objects.create(title='a', content='b')", "Article.create(title='a', content='b')", "Article.objects.new(title='a', content='b')", "Article.save(title='a', content='b')"], 0, "objects.create()는 객체 생성과 save()를 한 번에 합니다."],
+    ["가져온 글 객체 article을 삭제하는 코드는?", ["article.delete()", "Article.objects.remove(article)", "article.drop()", "del Article"], 0, "인스턴스의 delete() 메서드로 삭제합니다."],
+    ["템플릿에서 변수 값을 출력하는 문법은?", ["{{ article.title }}", "{% article.title %}", "{# article.title #}", "<%= article.title %>"], 0, "{{ }}는 변수 출력, {% %}는 태그, {# #}는 주석입니다."],
+    ["템플릿에서 글 목록을 반복 출력하는 올바른 문법은?", ["{% for article in articles %} … {% endfor %}", "{{ for article in articles }} … {{ endfor }}", "{% loop articles %} … {% endloop %}", "{% foreach article in articles %} … {% end %}"], 0, "DTL 반복은 {% for %} … {% endfor %}입니다."],
+    ["POST 방식 form 안에 꼭 넣어야 하는 템플릿 태그는?", ["{% csrf_token %}", "{% load static %}", "{% block content %}", "{% extends 'base.html' %}"], 0, "CSRF 공격을 막기 위해 POST 폼에는 csrf_token이 필요합니다."],
+    ["POST 폼에 csrf_token을 빼먹고 제출하면 보통 받는 응답은?", ["403 Forbidden", "404 Not Found", "500 Internal Server Error", "200 OK"], 0, "CSRF 검증에 실패하면 403 Forbidden이 반환됩니다."],
+    ["자식 템플릿이 base.html을 상속받으려면 첫 줄에 무엇을 쓸까?", ["{% extends 'base.html' %}", "{% include 'base.html' %}", "{% block 'base.html' %}", "{% load 'base.html' %}"], 0, "상속은 extends, 다른 템플릿 조각 끼워 넣기는 include입니다."],
+    ["path('<int:pk>/', views.detail, name='detail')에서 name의 역할은?", ["{% url %}이나 redirect에서 이름으로 URL을 찾게 해 준다", "뷰 함수 이름을 바꿔 준다", "DB 테이블 이름이 된다", "템플릿 파일 이름이 된다"], 0, "URL에 이름을 붙여 두면 주소가 바뀌어도 이름으로 참조할 수 있습니다."],
+    ["urls.py에 app_name = 'articles'를 적었다. 템플릿에서 상세 페이지 링크는?", ["{% url 'articles:detail' article.pk %}", "{% url 'detail.articles' article.pk %}", "{% url articles/detail article.pk %}", "{{ url 'articles:detail' article.pk }}"], 0, "app_name을 쓰면 '앱이름:URL이름' 형식으로 참조합니다."],
+    ["프로젝트 urls.py에서 앱의 urls.py를 연결하는 함수는?", ["include('articles.urls')", "import('articles.urls')", "extend('articles.urls')", "connect('articles.urls')"], 0, "path('articles/', include('articles.urls'))처럼 include로 연결합니다."],
+    ["뷰 함수에서 요청이 POST인지 확인하는 코드는?", ["if request.method == 'POST':", "if request.POST == True:", "if request.type == 'POST':", "if request.is_post():"], 0, "request.method에 'GET', 'POST' 같은 문자열이 들어 있습니다."],
+    ["render(request, 'articles/index.html', context)에서 context는 어떤 자료형일까?", ["딕셔너리", "리스트", "문자열", "튜플"], 0, "context는 템플릿에 넘길 값을 키-값으로 담은 딕셔너리입니다."],
+    ["글 생성에 성공한 뒤 상세 페이지로 보내는 함수는?", ["redirect", "render", "include", "path"], 0, "redirect는 다른 URL로 다시 요청하게 하고, render는 템플릿을 그려서 응답합니다."],
+    ["ModelForm이 어떤 모델과 연결될지 지정하는 곳은?", ["class Meta: 안의 model = Article", "__init__ 메서드 안", "settings.py", "urls.py"], 0, "ModelForm은 내부 Meta 클래스의 model과 fields로 설정합니다."],
+    ["ModelForm에서 모델의 모든 필드를 쓰려면?", ["fields = '__all__'", "fields = 'all'", "exclude = '__all__'", "fields = None"], 0, "fields = '__all__'이면 모든 필드를 폼에 포함합니다."],
+    ["폼에 들어온 데이터의 유효성을 검사하는 메서드는?", ["form.is_valid()", "form.validate()", "form.check()", "form.clean_all()"], 0, "is_valid()가 True일 때만 저장하거나 cleaned_data를 씁니다."],
+    ["is_valid()를 통과한 ModelForm을 DB에 저장하는 코드는?", ["form.save()", "form.commit()", "Article.save(form)", "form.create()"], 0, "ModelForm은 save()로 바로 모델 객체를 저장합니다."],
+    ["forms.Form에서 검증을 통과한 값을 꺼내는 곳은?", ["form.cleaned_data", "form.data_clean", "form.values", "form.fields_data"], 0, "is_valid() 후 cleaned_data 딕셔너리에서 꺼냅니다."],
+    ["수정 페이지에서 기존 글 내용이 채워진 폼을 만들려면?", ["ArticleForm(instance=article)", "ArticleForm(article)", "ArticleForm(data=article)", "ArticleForm(pk=article.pk)"], 0, "instance=로 기존 객체를 넘기면 그 값이 채워집니다."],
+    ["수정 요청(POST)을 처리할 때 올바른 폼 생성 코드는?", ["ArticleForm(request.POST, instance=article)", "ArticleForm(request.POST)", "ArticleForm(instance=request.POST)", "ArticleForm(request.GET, instance=article)"], 0, "instance를 빼면 수정이 아니라 새 글이 만들어집니다."],
+    ["게시글 삭제는 보통 어떤 요청 방식으로 처리할까?", ["POST", "GET", "어떤 방식이든 상관없다", "HEAD"], 0, "GET으로 삭제하면 링크만 열어도 지워질 수 있어서 POST로 처리합니다."],
+    ["검색창에서 GET으로 보낸 q 값을 뷰에서 꺼내는 코드는?", ["request.GET.get('q')", "request.POST.get('q')", "request.q", "request.query('q')"], 0, "GET 파라미터는 request.GET에 들어 있습니다."],
+    ["python manage.py runserver의 기본 포트는?", ["8000", "3000", "5000", "8080"], 0, "기본 주소는 http://127.0.0.1:8000/ 입니다."],
+    ["마이그레이션 파일이 실제로 실행할 SQL을 확인하는 명령어는?", ["python manage.py sqlmigrate articles 0001", "python manage.py showsql articles", "python manage.py migrate --print", "python manage.py makemigrations --sql"], 0, "sqlmigrate 앱이름 번호로 SQL을 볼 수 있습니다."],
+    ["템플릿에서 폼 필드를 <p> 태그로 감싸서 한 번에 출력하는 코드는?", ["{{ form.as_p }}", "{% form.as_p %}", "{{ form.p }}", "{{ form | p }}"], 0, "{{ form.as_p }}는 각 필드를 <p>로 감싸 출력합니다."]
+  ];
+  var CATCH = ["어데 도망가노! 잡았데이!", "니 딱 걸렸다, 마!", "이 시간까지 안 가고 머하노? 문제나 풀어 봐라!", "거 서라 캤제! 이거 맞추면 보내주께."];
+  var PRAISE = ["오~ 맞췄네! 니 수업 쫌 듣는갑네?", "하모! 그기 정답이다 아이가. 잘했데이!", "와, 니 쫌 치네? 장고 완전 마스터했뿟나?", "맞다 맞다! 오늘은 봐주께. 퍼뜩 가라!", "그래, 이기 정답이다! 복습 쫌 했나 보네? 기특하데이."];
+  var quizDeck = [];
+  var qz = { q: null, opts: [], ans: 0, sel: 0, end: 0, timer: null, locked: false, gone: [], lastSec: 0, limit: 20000 };
+  function caught() {
+    if (state === "over" || state === "quiz") {
+      return;
+    }
+    state = "quiz";
+    held = [];
+    P.hidden = false;
+    P.moving = false;
+    ["hidebox", "dlg", "choice", "chatform", "codeform", "menu"].forEach(function (id) {
+      $(id).hidden = true;
+    });
+    sfx("stinger");
+    shake(600);
+    if (!quizDeck.length) {
+      quizDeck = shuffle(QUIZ.map(function (q, i) { return i; }));
+    }
+    var q = QUIZ[quizDeck.pop()];
+    var order = shuffle([0, 1, 2, 3]);
+    qz.q = q;
+    qz.opts = order.map(function (k) { return q[1][k]; });
+    qz.ans = order.indexOf(q[2]);
+    qz.sel = 0;
+    qz.locked = false;
+    qz.gone = [];
+    qz.limit = st.f.quiz30 ? 30000 : 20000;
+    qz.end = performance.now() + qz.limit;
+    qz.lastSec = 99;
+    drawFace($("quiz-face"), "이자룡");
+    $("quiz-title").textContent = "이자룡: \"" + rand(CATCH) + "\"";
+    $("quiz-sub").textContent = "Django 문제를 " + (qz.limit / 1000) + "초 안에 맞히면 보내 주신다";
+    $("quiz-q").textContent = "Q. " + q[0];
+    renderQuiz();
+    $("quiz").hidden = false;
+    clearInterval(qz.timer);
+    qz.timer = setInterval(quizTick, 100);
+    quizTick();
+  }
+  function renderQuiz() {
+    $("quiz-opts").innerHTML = qz.opts.map(function (o, i) {
+      var gone = qz.gone.indexOf(i) >= 0;
+      return '<button type="button" class="qopt' + (i === qz.sel ? " sel" : "") + (gone ? " gone" : "") + '" data-q="' + i + '"><b>' + (i + 1) + "</b>" + esc(o) + "</button>";
+    }).join("");
+    var bs = $("quiz-opts").querySelectorAll(".qopt");
+    var i;
+    for (i = 0; i < bs.length; i++) {
+      bs[i].addEventListener("click", function (e) {
+        quizAnswer(Number(e.currentTarget.getAttribute("data-q")));
+      });
+    }
+    $("quiz-chance").textContent = "50:50 찬스 (" + st.f.chance + ")";
+    $("quiz-chance").disabled = st.f.chance <= 0 || qz.gone.length > 0 || qz.locked;
+  }
+  function useChance() {
+    if (st.f.chance <= 0 || qz.gone.length || qz.locked) {
+      return;
+    }
+    st.f.chance -= 1;
+    qz.gone = shuffle([0, 1, 2, 3].filter(function (i) { return i !== qz.ans; })).slice(0, 2);
+    if (qz.gone.indexOf(qz.sel) >= 0) {
+      qz.sel = [0, 1, 2, 3].filter(function (i) { return qz.gone.indexOf(i) < 0; })[0];
+    }
+    renderQuiz();
+  }
+  function quizTick() {
+    var left = Math.max(0, qz.end - performance.now());
+    $("quiz-time").textContent = (left / 1000).toFixed(1);
+    $("quiz-bar").style.width = (left / qz.limit * 100).toFixed(1) + "%";
+    var sec = Math.ceil(left / 1000);
+    if (sec <= 5 && sec !== qz.lastSec) {
+      qz.lastSec = sec;
+      sfx("tick");
+    }
+    if (left <= 0 && !qz.locked) {
+      quizAnswer(-1);
+    }
+  }
+  function quizAnswer(i) {
+    if (qz.locked || (i >= 0 && qz.gone.indexOf(i) >= 0)) {
+      return;
+    }
+    qz.locked = true;
+    clearInterval(qz.timer);
+    var bs = $("quiz-opts").querySelectorAll(".qopt");
+    if (bs[qz.ans]) {
+      bs[qz.ans].classList.add("ok");
+    }
+    if (i >= 0 && i !== qz.ans && bs[i]) {
+      bs[i].classList.add("no");
+    }
+    $("quiz-chance").disabled = true;
+    var ok = i === qz.ans;
+    sfx(ok ? "good" : "bad");
+    setTimeout(function () {
+      $("quiz").hidden = true;
+      if (ok) {
+        st.quizOk = (st.quizOk || 0) + 1;
+        loseTeacher(true);
+        state = "play";
+        say([page("이자룡", rand(PRAISE)), narr("강사님이 낄낄 웃으며 어둠 속으로 사라지셨다.\n지금이 기회다!")]);
+      } else {
+        var head = i < 0 ? "이자룡: \"시간 다 됐데이. 보충이다, 마!\"" : "이자룡: \"틀렸다 아이가! 보충 수업 들으러 가재이.\"";
+        gameOver(head + "\n\n정답: " + qz.q[1][qz.q[2]] + "\n" + qz.q[3]);
+      }
+    }, ok ? 900 : 1300);
+  }
+  function gameOver(reason) {
+    st.caught += 1;
+    state = "over";
+    held = [];
+    $("over-txt").textContent = reason + "\n\n(보충 수업 " + st.caught + "회)";
+    $("over").hidden = false;
+    setTimeout(function () { $("over-retry").focus(); }, 50);
+  }
+  function retry() {
+    var keep = { caught: st.caught, time: st.time, quizOk: st.quizOk, ep: st.ep };
+    st = JSON.parse(JSON.stringify(CK));
+    Object.keys(keep).forEach(function (k) {
+      st[k] = keep[k];
+    });
+    st.lore = st.lore || {};
+    applyWorld();
+    P.map = st.map;
+    P.x = st.x;
+    P.y = st.y;
+    P.dir = st.dir;
+    P.moving = false;
+    P.hidden = false;
+    P.entry = { x: P.x, y: P.y };
+    if (st.f.chase) {
+      TCH.state = "away";
+      TCH.map = P.map;
+      TCH.at = gt + 12000;
+    } else {
+      TCH.state = "off";
+    }
+    $("over").hidden = true;
+    state = "play";
+    hud();
+    showLoc();
+    checkpoint();
+  }
+
+  /* ================= 맵 이동 ================= */
+  function onArrive() {
+    var f = st.f;
+    if (P.map === "hall4" && !f.saw4f) {
+      f.saw4f = true;
+      say([narr("4층은 불이 반쯤 꺼져 있다…", function () { flicker(1400); }), narr("복도 끝에 무언가 서 있다.", function () {
+        SCARE = { map: "hall4", x: 30, y: 2, until: gt + 2200 };
+        sfx("scare");
+        shake(400);
+      }), narr("…눈을 깜빡이자 사라졌다. 기분 탓이었을까.")]);
+      return;
+    }
+    if (P.map === "b1" && !f.sawB1) {
+      f.sawB1 = true;
+      say([narr("차가운 공기가 훅 끼쳐 온다. B1 창고다."), narr("안쪽 어딘가에서 문 두드리는 소리가 들린다.", function () { sfx("knock"); })]);
+      return;
+    }
+    if (MAPS[P.map].safe && f.chase && !f.toiletSafeSeen) {
+      f.toiletSafeSeen = true;
+      say([narr("화장실이다. 이상하게 마음이 놓인다."), narr("(강사님은 화장실에 들어오지 않는다)")]);
+    }
+  }
+  function goMap(map, x, y, dir, viaElevator) {
+    var fromMap = P.map;
+    var exX = P.x;
+    var exY = P.y;
+    state = "fade";
+    held = [];
+    $("dlg").hidden = true;
+    $("choice").hidden = true;
+    $("fade").classList.add("on");
+    sfx(viaElevator ? "elev" : "door");
+    setTimeout(function () {
+      P.map = map;
+      P.x = x;
+      P.y = y;
+      P.dir = dir;
+      P.moving = false;
+      P.entry = { x: x, y: y };
+      teacherFollow(fromMap, exX, exY, map, x, y, viaElevator);
+      $("fade").classList.remove("on");
+      state = "play";
+      hud();
+      showLoc();
+      checkpoint();
+      onArrive();
+    }, 260);
+  }
+
+  /* ================= 조사 ================= */
+  var ELEV = [
+    { label: "B1 · 창고", map: "b1", x: 11, y: 1, dir: "down" },
+    { label: "1층 · 로비", map: "lobby", x: 11, y: 1, dir: "down" },
+    { label: "2층 · 라운지", map: "l2", x: 14, y: 1, dir: "down" },
+    { label: "3층 · 강의실", map: "hall3", x: 6, y: 5, dir: "up" },
+    { label: "4층 · 실습실·서버실", map: "hall4", x: 6, y: 5, dir: "up" },
+    { label: "10층 · 식당", map: "caf10", x: 9, y: 1, dir: "down" },
+    { label: "20층 · 식당", map: "caf20", x: 9, y: 1, dir: "down" },
+    { label: "그만두기" }
+  ];
+  function elevator() {
+    if (!has("elevKey")) {
+      say([narr("엘리베이터 전원이 꺼져 있다.\n엘리베이터 키가 있어야 움직일 것 같다.")]);
+      return;
+    }
+    choose(null, "엘리베이터 키를 꽂았다. 몇 층으로 갈까?", ELEV.map(function (e) { return e.label; }), function (i) {
+      var e = ELEV[i];
+      if (!e.map) {
+        return;
+      }
+      if (e.map === P.map) {
+        say([narr("이미 이 층이다.")]);
+        return;
+      }
+      goMap(e.map, e.x, e.y, e.dir, true);
+    });
+  }
+  var codeMode = "gate";
+  function openCode(mode, hint) {
+    codeMode = mode;
+    state = "code";
+    $("dlg").hidden = false;
+    setSpeaker(null);
+    $("dlg-text").textContent = hint;
+    $("dlg-more").hidden = true;
+    $("codeform").hidden = false;
+    $("code-in").value = "";
+    setTimeout(function () { $("code-in").focus(); }, 0);
+  }
+  function gate() {
+    if (!has("pass")) {
+      say([narr("건물 정문이다. 굳게 잠겨 있다."), narr("출입증을 찍고 비밀번호 4자리를 눌러야 열리는 문이다.")]);
+      return;
+    }
+    if (!st.f.rescued) {
+      say([narr("출입증은 있지만… 박민희 프로님이 아직 B1에 갇혀 계신다."), narr("프로님을 두고 혼자 나갈 수는 없다.")]);
+      return;
+    }
+    say([narr("출입증을 찍었다. 삑!")], function () {
+      openCode("gate", "정문 비밀번호 4자리" + (st.f.memoGate ? "\n(메모: 반장 출생연도 끝 두 자리 + CA 출생연도 끝 두 자리)" : ""));
+    });
+  }
+  function closeCode() {
+    $("codeform").hidden = true;
+    $("dlg").hidden = true;
+    $("code-in").blur();
+    state = "play";
+  }
+  function onCode(e) {
+    e.preventDefault();
+    var v = $("code-in").value.replace(/\D/g, "");
+    $("codeform").hidden = true;
+    $("code-in").blur();
+    state = "play";
+    if (codeMode === "b1") {
+      if (v === B1CODE) {
+        st.f.doorOpen = true;
+        applyWorld();
+        sfx("open");
+        checkpoint();
+        say([narr("삐리릭! 도어락이 열렸다."), page("박민희", "열렸다…! 안으로 들어와요!")]);
+      } else {
+        sfx("bad");
+        say([narr("삐빅! 비밀번호가 틀렸다."), page("박민희", st.f.b1hint ? "우리 기수 두 자리, 그다음 반 번호 두 자리예요!" : "비밀번호는 7반 봇에 저장해 뒀어요…")]);
+      }
+      return;
+    }
+    if (v === CODE) {
+      sfx("open");
+      winGame();
+      return;
+    }
+    sfx("bad");
+    say([narr("삐빅! 비밀번호가 틀렸다."), narr(st.f.memoGate ? "반장과 CA의 출생연도는 반 친구들이나 7반 봇에게 물어볼 수 있다." : "정문 비밀번호 규칙은 7반 봇의 시설팀 공지에 있을 것 같다.")]);
+  }
+  function searchOnce(flag, item, found, empty) {
+    if (!st.f[flag]) {
+      st.f[flag] = true;
+      give(item);
+      checkpoint();
+      say(found.map(function (t) { return narr(t); }));
+    } else {
+      say(empty.map(function (t) { return narr(t); }));
+    }
+  }
+  function interact() {
+    var v = DV[P.dir];
+    var tx = P.x + v[0];
+    var ty = P.y + v[1];
+    var npc = npcAt(P.map, tx, ty);
+    if (npc) {
+      npc.dir = OPP[P.dir];
+      if (npc.kind === "pro") {
+        talkPro();
+      } else if (npc.kind === "dog") {
+        if (npc.map === "t2") {
+          talkDog();
+        } else {
+          sfx("bark");
+          say([narr("똘이가 꼬리를 흔든다.")]);
+        }
+      } else {
+        talkMate(npc);
+      }
+      return;
+    }
+    var m = MAPS[P.map];
+    var c = tileAt(m, tx, ty);
+    var key = tx + "," + ty;
+    if (c === "K" && P.map === "r304") {
+      openBot();
+      return;
+    }
+    if (c === "K" && P.map === "server") {
+      say([narr("서버 콘솔이다."), narr(st.f.botFixed ? "[7ban-rag] vector store OK · documents: 29" : "[7ban-rag] ERROR: vector store corrupted · documents: 0")]);
+      return;
+    }
+    if (c === "V") {
+      elevator();
+      return;
+    }
+    if (c === "G") {
+      gate();
+      return;
+    }
+    if (c === "L") {
+      hide();
+      return;
+    }
+    if (c === "S" && m.signs && m.signs[key]) {
+      say([narr(m.signs[key])]);
+      return;
+    }
+    if (P.map === "r304" && c === "T") {
+      if (!st.f.desk) {
+        st.f.desk = true;
+        checkpoint();
+        chapter("제1장 · 사라진 프로님");
+        say([narr("교탁 위에 출석부와 쪽지가 놓여 있다."), narr("박민희 프로님 글씨다.\n\"B1 창고 점검하고 금방 올게요! — 박민희\""), narr("쪽지 귀퉁이에 시간이 적혀 있다. 오후 7시 10분."), narr("…세 시간 가까이 지났는데 아직 안 돌아오셨다.", function () { flicker(900); }), narr("B1에 가려면 엘리베이터가 필요하다. 반 친구들에게 물어보자.")]);
+      } else {
+        say([narr("교탁이다. 프로님 쪽지가 놓여 있다.")]);
+      }
+      return;
+    }
+    if (P.map === "hall3" && c === "M") {
+      if (has("coin")) {
+        take("coin");
+        give("monster");
+        checkpoint();
+        say([narr("동전을 넣었다. 덜컹!"), narr("몬스터가 나왔다!")]);
+      } else {
+        say([narr("음료 자판기다. 동전이 없다.")]);
+      }
+      return;
+    }
+    if (P.map === "l2" && c === "k") {
+      if (!has("coffee")) {
+        give("coffee");
+        say([narr("커피 머신 버튼을 눌렀다. 위이잉…"), narr("진한 커피 한 잔이 나왔다.")]);
+      } else {
+        say([narr("커피는 이미 한 잔 들고 있다.")]);
+      }
+      return;
+    }
+    if (P.map === "l2" && c === "h") {
+      searchOnce("pieTaken", "pie", ["간식 진열대를 뒤졌다.", "초코파이 하나를 찾았다!"], ["간식 진열대다. 텅 비었다."]);
+      return;
+    }
+    if (P.map === "r303" && c === "X") {
+      searchOnce("coinTaken", "coin", ["교탁 서랍을 열었다.", "동전을 찾았다!"], ["교탁 서랍이다. 비어 있다."]);
+      return;
+    }
+    if (P.map === "caf20" && c === "R" && tx === 8) {
+      searchOnce("jellyTaken", "jelly", ["배식대 구석을 살폈다.", "젤리 한 봉지를 찾았다!"], ["배식대다. 오늘 배식은 끝났다."]);
+      return;
+    }
+    if (P.map === "office" && c === "F") {
+      if (st.f.minji2 >= 1) {
+        searchOnce("bookTaken", "book", ["책장을 살폈다.", "삼국지 1권을 찾았다!"], ["Django 책이 빼곡히 꽂혀 있다."]);
+      } else {
+        say([narr("Django 책이 빼곡히 꽂혀 있다. 삼국지도 한 권 보인다.")]);
+      }
+      return;
+    }
+    if (P.map === "office" && c === "B") {
+      say([narr("화이트보드에 메모가 붙어 있다."), narr("\"야간 정문 비밀번호 규칙 변경! 시설팀 공지 참고 (7반 봇 DB에 등록)\""), narr("…공지 내용은 7반 봇에게 물어봐야 알 수 있을 것 같다.")]);
+      return;
+    }
+    if (P.map === "office" && c === "T" && tx === 10 && ty === 2) {
+      st.f.memoB1 = true;
+      say([narr("책상 위에 시설팀 메모가 있다."), narr("\"B1 창고 안쪽 방 도어락 오작동. 비밀번호는 박민희 프로님만 알고 계심.\""), narr("…그 아래에 붉은 펜으로 휘갈긴 글씨가 있다.\n\"과제 검사 과제 검사 과제 검사\"", function () { flicker(800); })]);
+      return;
+    }
+    if (P.map === "office" && c === "X") {
+      if (!st.f.keyTaken) {
+        st.f.keyTaken = true;
+        give("elevKey");
+        checkpoint();
+        say([narr("서랍장을 열었다."), narr("엘리베이터 키를 찾았다! B1까지 갈 수 있을 것 같다."), narr("…그때, 복도에서 무언가 질질 끌리는 소리가 난다.", function () { stepBoss(0.7, 0); }), narr("쿵. 쿵. 쿵.", function () { stepBoss(1, 0); shake(400); }), page("이자룡", "니들 이 시간까지 안 가고 머하노?! 과제는… 과제는 다 했나?!", function () { sfx("stinger"); flicker(1000); }), narr("이자룡 강사님이 쫓아온다! 도망치자!\n(사물함에 숨거나 화장실로 피하자)")], function () {
+          startChase();
+          checkpoint();
+        });
+      } else {
+        say([narr("서랍장이다. 더는 쓸 만한 게 없다.")]);
+      }
+      return;
+    }
+    if (P.map === "b1" && c === "Z") {
+      var pg = [narr("창고 안쪽 방 문이다. 안에서 누군가 문을 두드린다.", function () { sfx("knock"); }), page("박민희", "거기 누구 있어요? 저 박민희 프로예요! 도어락이 고장 나서 못 나가고 있어요.")];
+      if (!st.f.b1hint) {
+        pg.push(page("박민희", "비밀번호는 혹시 몰라서 304호 7반 봇에 저장해 뒀어요. 봇한테 물어봐 줄래요?"));
+        say(pg, function () {
+          openCode("b1", "B1 창고 도어락 · 비밀번호 4자리");
+        });
+        return;
+      }
+      say(pg, function () {
+        openCode("b1", "B1 창고 도어락 · 비밀번호 4자리\n(7반 봇: 우리 기수 두 자리 + 우리 반 두 자리)");
+      });
+      return;
+    }
+    if (m.msg && m.msg[c]) {
+      say(m.msg[c].map(function (t) { return narr(t); }));
+    }
+  }
+
+  /* ================= 숨기 ================= */
+  function hide() {
+    if (!st.f.chase) {
+      say([narr("사물함이다. 사람 하나는 들어갈 수 있을 것 같다.")]);
+      return;
+    }
+    P.hidden = true;
+    state = "hide";
+    held = [];
+    $("hidebox").hidden = false;
+    sfx("door");
+    if (teacherVisible()) {
+      var dist = Math.abs(TCH.x - P.x) + Math.abs(TCH.y - P.y);
+      TCH.found = dist <= (st.f.hideMaster ? 1 : 3);
+    }
+  }
+  function unhide() {
+    P.hidden = false;
+    $("hidebox").hidden = true;
+    state = "play";
+  }
+
+  /* ================= 7반 봇 ================= */
+  function paginate(text) {
+    var out = [];
+    var buf = "";
+    text.split("\n").forEach(function (line) {
+      var parts = [];
+      var rest = line;
+      while (rest.length > 90) {
+        var cut = rest.lastIndexOf(" ", 90);
+        if (cut < 40) {
+          cut = 90;
+        }
+        parts.push(rest.slice(0, cut));
+        rest = rest.slice(cut).trim();
+      }
+      parts.push(rest);
+      parts.forEach(function (pt2) {
+        var lines = buf ? buf.split("\n").length : 0;
+        if (buf && (lines >= 3 || buf.length + pt2.length > 120)) {
+          out.push(buf);
+          buf = pt2;
+        } else {
+          buf = buf ? buf + "\n" + pt2 : pt2;
+        }
+      });
+    });
+    if (buf) {
+      out.push(buf);
+    }
+    return out;
+  }
+  /* ================= 사건 기록 (RAG 문서) ================= */
+  var STORY = [{"id": "memo", "name": "박민희 프로님 메모", "kw": {"b1": 3, "창고": 2, "도어락": 3, "메모": 2, "프로님": 1, "박민희": 1, "비밀번호": 1, "비번": 1, "안쪽": 1}, "text": "박민희 프로님이 7반 봇에 저장해 둔 메모입니다. 'B1 창고 안쪽 방 도어락이 자주 고장 나서 비밀번호를 여기 적어 둬요. B1 창고 비밀번호는 우리 기수 두 자리, 그다음 우리 반 번호 두 자리예요. 반 번호가 한 자리면 앞에 0을 붙여요. 오늘 저녁 7시쯤 B1 창고 점검하러 내려갑니다. — 박민희'"}, {"id": "gate", "name": "시설팀 공지 · 야간 정문 출입", "kw": {"정문": 3, "출입": 2, "야간": 2, "공지": 2, "출입증": 2, "비밀번호": 1, "비번": 1, "탈출": 1, "나가": 1}, "text": "시설팀 공지(야간 정문 출입 안내)입니다. 밤 9시 이후 건물 정문은 출입증을 찍고 비밀번호 4자리를 눌러야 열립니다. 7반 야간 정문 비밀번호는 '반장 출생연도 끝 두 자리 + CA 출생연도 끝 두 자리'입니다. 7반 출입증은 반장이 보관합니다."}, {"id": "facility", "name": "시설팀 점검 일지", "kw": {"시설팀": 3, "점검": 3, "엘리베이터": 2, "시설": 1, "일지": 1, "고장": 1}, "text": "시설팀 점검 일지(오늘)입니다. 18:50 엘리베이터 야간 모드 전환, 엘리베이터 전원 키는 3층 강사실 서랍장에 보관. 19:05 박민희 프로 B1 창고 점검 시작. 19:20 B1 창고 안쪽 방 도어락 오작동 신고 접수, 내일 아침 수리 예정. 20:30 3층 강사실에 아직 불이 켜져 있음(이자룡 강사 채점 중)."}, {"id": "guard", "name": "경비실 근무 기록", "kw": {"경비": 3, "cctv": 3, "근무": 2, "기록": 1, "그림자": 2, "보라": 2}, "text": "경비실 근무 기록(오늘 밤)입니다. 21:10 3층 복도 CCTV에 키 큰 사람이 천천히 걷는 모습이 찍힘. 얼굴이 이상하게 보라색으로 보임. 21:25 그 사람이 3층 화장실 앞에서 한참 서 있다가 끝내 들어가지 않고 돌아감. 21:40 4층 복도 조명이 반쯤 나감. 21:45 경비원 조기 퇴근, 정문 야간 잠금."}, {"id": "diary", "name": "이자룡 강사 업무 일지", "kw": {"업무": 3, "이자룡": 2, "자룡": 2, "강사": 1, "강사님": 1, "과제": 2, "일지": 1, "검사": 2}, "text": "이자룡 강사 업무 일지입니다. '관통 프로젝트 과제 검사, 오늘 밤 안에 무조건 끝낸다. 한 놈도 집에 못 간데이. 과제 검사 과제 검사 과제 검사. 화장실은 내 구역 아이다. 사물함 안은 가까이 가야 보인다. 7반 봇이 자꾸 아들 도와준다. 확 지워삐야겠다.'"}, {"id": "server", "name": "서버 장애 보고", "kw": {"서버": 3, "장애": 3, "삭제": 3, "db": 2, "데이터": 1, "복구": 1, "지운": 2, "날아": 2, "범인": 3}, "text": "서버 장애 보고(작성 정소연)입니다. 20:50 7반 봇 벡터 DB 컬렉션 전체가 삭제됨. 삭제 요청은 3층 강사실 PC에서 들어옴. 백업은 없음. 반장 이승진이 모으던 소개글 카드로 다시 임베딩하면 복구 가능."}];
+  function storyMatch(q) {
+    var t = q.toLowerCase().replace(/\s+/g, "");
+    var best = null;
+    var bs = 0;
+    STORY.forEach(function (d) {
+      var sc = 0;
+      Object.keys(d.kw).forEach(function (k) {
+        if (t.indexOf(k) >= 0) {
+          sc += d.kw[k];
+        }
+      });
+      if (sc > bs) {
+        bs = sc;
+        best = d;
+      }
+    });
+    return bs >= 3 ? best : null;
+  }
+  function loreN() {
+    return STORY.filter(function (d) { return st.lore[d.id]; }).length;
+  }
+  function foundLore(id) {
+    var d = STORY.filter(function (x) { return x.id === id; })[0];
+    if (!d) {
+      return;
+    }
+    if (id === "memo") {
+      st.f.b1hint = true;
+    }
+    if (id === "gate") {
+      st.f.memoGate = true;
+    }
+    if (!st.lore[id]) {
+      st.lore[id] = true;
+      flash("새 기록 발견: " + d.name + " (" + loreN() + "/" + STORY.length + ")", "item");
+      sfx("item");
+    }
+    checkpoint();
+  }
+  function detectClues(text) {
+    if (/기수/.test(text) && /반/.test(text) && /(B1|창고|도어락)/i.test(text)) {
+      foundLore("memo");
+    }
+    if (/반장/.test(text) && /CA/.test(text) && /(끝|출생)/.test(text) && /정문/.test(text)) {
+      foundLore("gate");
+    }
+  }
+  function openBot() {
+    var f = st.f;
+    if (!f.botFixed) {
+      if (f.desk && !f.botSeen) {
+        f.botSeen = true;
+        checkpoint();
+        say([page("7반 봇", "7반 봇입니다. 무엇을 도와드릴까요?"), narr("\"박민희 프로님 B1 창고\"라고 입력했다."), page("7반 봇", "[오류] 벡터 DB를 찾을 수 없습니다. documents: 0"), page("7반 봇", "검색할 문서가 없어 답할 수 없습니다. 관리자에게 문의하세요.", function () { flicker(600); }), narr("봇의 데이터가 날아간 것 같다.\n4층 서버실에 RAG 프로젝트를 하던 정소연이 있다고 들었다.")]);
+        return;
+      }
+      say([page("7반 봇", "[오류] 벡터 DB가 비어 있습니다. documents: 0")]);
+      return;
+    }
+    if (!f.botIntro) {
+      f.botIntro = true;
+      checkpoint();
+      say([page("7반 봇", "[RAG DB 복구 완료] documents: 35"), page("7반 봇", "반 정보 1건, 요약 5건, 반 친구 소개글 23건, 그리고 출처를 알 수 없는 기록 문서 " + STORY.length + "건이 함께 복구되었습니다."), narr("프로님이 메모를 봇에 저장해 두셨다고 했다.\n궁금한 걸 물어보자. 다른 기록도 섞여 있는 것 같다.")], showChat);
+      return;
+    }
+    say([page("7반 봇", "7반 봇입니다. 반 친구 정보나 기록 문서를 물어보세요. (그만두려면 '그만')")], showChat);
+  }
+  function showChat() {
+    state = "chat";
+    $("dlg").hidden = false;
+    setSpeaker("7반 봇");
+    var ex = st.f.botFixed ? "예: '박민희 프로님 메모', '시설팀 일지', '반장 몇 년생이야?'" : "예: '반장 몇 년생이야?'";
+    $("dlg-text").textContent = "질문을 입력하세요. " + ex + "\n" + (st.ep ? "연결: " + st.ep : "(게임 안 검색으로 답합니다)");
+    $("dlg-more").hidden = true;
+    $("chatform").hidden = false;
+    $("chat-in").value = "";
+    setTimeout(function () { $("chat-in").focus(); }, 0);
+  }
+  function closeChat() {
+    $("chatform").hidden = true;
+    $("dlg").hidden = true;
+    $("chat-in").blur();
+    state = "play";
+  }
+  function botAnswer(q, cb, raw) {
+    if (!raw && !st.f.botFixed) {
+      cb("[오류] 벡터 DB가 비어 있어 검색할 문서가 없습니다. (documents: 0)", "");
+      return;
+    }
+    var sd = raw ? null : storyMatch(q);
+    if (sd) {
+      foundLore(sd.id);
+    }
+    var local = sd ? { text: "[기록] " + sd.name + "\n" + sd.text } : answer(q);
+    if (!st.ep) {
+      cb(local.text, "");
+      return;
+    }
+    var ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+    var to = setTimeout(function () {
+      if (ctrl) {
+        ctrl.abort();
+      }
+    }, 60000);
+    fetch(st.ep, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt: q }), signal: ctrl ? ctrl.signal : undefined })
+      .then(function (res) {
+        if (!res.ok) {
+          throw new Error("HTTP " + res.status);
+        }
+        return res.text();
+      })
+      .then(function (txt) {
+        clearTimeout(to);
+        var ans = txt;
+        try {
+          ans = JSON.parse(txt).answer || txt;
+        } catch (e) {
+          /* 텍스트 그대로 */
+        }
+        if (!raw) {
+          detectClues(String(ans));
+        }
+        cb(String(ans), "");
+      })
+      .catch(function (err) {
+        clearTimeout(to);
+        cb(local.text, "(서버에 연결하지 못해 게임 안 검색으로 답했습니다: " + err.message + ")");
+      });
+  }
+  function onChat(e) {
+    e.preventDefault();
+    var q = $("chat-in").value.trim();
+    if (!q || q === "그만") {
+      closeChat();
+      return;
+    }
+    $("chatform").hidden = true;
+    $("chat-in").blur();
+    state = "wait";
+    $("dlg-text").textContent = "생각 중…";
+    botAnswer(q, function (text, note) {
+      var pages = paginate(text).map(function (t) { return page("7반 봇", t); });
+      if (note) {
+        pages.push(narr(note));
+      }
+      say(pages, showChat);
+    });
+  }
+
+  /* ================= 메뉴 ================= */
+  var MENU = ["소지품", "미션", "반 친구", "반 정보", "챗봇 서버", "기록", "닫기"];
+  var menuSel = 0;
+  function openMenu() {
+    state = "menu";
+    menuSel = 0;
+    $("menu").hidden = false;
+    renderMenu();
+    menuPanel(0);
+  }
+  function closeMenu() {
+    $("menu").hidden = true;
+    state = "play";
+    hud();
+  }
+  function renderMenu() {
+    $("menu-ul").innerHTML = MENU.map(function (m, i) {
+      return '<li data-m="' + i + '"' + (i === menuSel ? ' class="sel"' : "") + ">" + esc(m) + "</li>";
+    }).join("");
+    var lis = $("menu-ul").querySelectorAll("li");
+    var i;
+    for (i = 0; i < lis.length; i++) {
+      lis[i].addEventListener("click", function (e) {
+        menuSel = Number(e.currentTarget.getAttribute("data-m"));
+        renderMenu();
+        menuGo(menuSel);
+      });
+    }
+  }
+  function menuGo(i) {
+    if (i === MENU.length - 1) {
+      closeMenu();
+      return;
+    }
+    menuPanel(i);
+  }
+  function faceCanvas(name) {
+    var c = document.createElement("canvas");
+    c.width = 64;
+    c.height = 56;
+    drawFace(c, name);
+    return c;
+  }
+  function qrow(title, status, desc) {
+    var cls = status === "완료" ? "done" : status === "진행 중" ? "go" : "no";
+    return '<div class="quest"><div class="qt"><span class="st ' + cls + '">' + status + "</span><span>" + esc(title) + '</span></div><div class="small">' + esc(desc) + "</div></div>";
+  }
+  function stt(v) {
+    return v === 2 ? "완료" : v === 1 ? "진행 중" : "시작 전";
+  }
+  function menuPanel(i) {
+    var el = $("menu-panel");
+    var f = st.f;
+    if (i === 0) {
+      var perks = [];
+      if (f.boost) {
+        perks.push("이동 속도 증가 (몬스터)");
+      }
+      if (f.quiz30) {
+        perks.push("퀴즈 제한 시간 30초 (젤리)");
+      }
+      if (f.chance > 0) {
+        perks.push("50:50 찬스 " + f.chance + "회 (초코파이)");
+      }
+      if (f.hideMaster) {
+        perks.push("숨기 요령 (삼국지)");
+      }
+      el.innerHTML = "<h3>소지품</h3>" + (st.inv.length ? st.inv.map(function (id) {
+        var it = ITEMS[id];
+        return '<div class="item"><b>' + esc(it[0]) + (id === "card" ? " ×" + cardsN() : "") + "</b><span>" + esc(it[1]) + "</span></div>";
+      }).join("") : '<p class="small">아직 아무것도 없다.</p>') +
+        (perks.length ? "<h3 style=\"margin-top:12px\">받은 도움</h3>" + perks.map(function (p) { return '<div class="item"><span>' + esc(p) + "</span></div>"; }).join("") : "");
+    } else if (i === 1) {
+      var cardsState = f.seungjin === 2 ? "완료" : f.seungjin === 1 ? "진행 중" : "시작 전";
+      el.innerHTML = "<h3>미션</h3><p class=\"small\">목표 · " + esc(objective()) + "</p>" +
+        "<div class=\"small\" style=\"margin-top:8px;color:var(--accent)\">메인 스토리</div>" +
+        qrow("제1장 · 사라진 프로님", f.desk ? "완료" : "시작 전", "304호 교탁의 쪽지 확인") +
+        qrow("CA의 부탁", stt(f.soyoung), "박소영(304호)에게 정민지(303호)의 과외 노트를 전해 주고 강사실 열쇠 받기") +
+        qrow("제2장 · 강사실", has("elevKey") ? "완료" : has("officeKey") ? "진행 중" : "시작 전", "강사실에서 엘리베이터 키 찾기. 메모와 화이트보드도 살펴보자") +
+        qrow("고장 난 7반 봇", f.sohyeon ? "완료" : f.botSeen ? "진행 중" : "시작 전", "304호 7반 봇에게 B1 비밀번호 묻기 → 4층 서버실 정소연") +
+        qrow("제3장 · 7반 봇 복구", cardsState, "반장 이승진(20층)에게 소개글 카드 5장 모아 주기" + (f.seungjin === 1 ? " · " + cardsN() + "/" + CARD_FROM.length : "")) +
+        qrow("  └ 송현우의 질문", st.cards["송현우"] ? "완료" : "시작 전", "401호 · 우리 반 전자공학 전공자는?") +
+        qrow("  └ 민주동생의 추리", st.cards["차주영"] ? "완료" : "시작 전", "3층 복도 · 고민주는 어디에?") +
+        qrow("  └ 잠 깨우기", st.cards["류선우"] ? "완료" : "시작 전", "10층 · 2층 라운지 커피를 류선우에게") +
+        qrow("  └ 쟝고 SOS", st.cards["박현모"] ? "완료" : "시작 전", "20층 · 박현모의 Django 질문에 답하기") +
+        qrow("  └ 사라진 똘이", st.cards["최장현"] ? "완료" : f.dogFound ? "진행 중" : "시작 전", "3층 복도 · 최장현의 반려견 찾기") +
+        qrow("박민희 프로님 구출", f.rescued ? "완료" : f.doorOpen ? "진행 중" : f.b1hint ? "진행 중" : "시작 전", "복구된 7반 봇에서 프로님 메모를 찾아 B1 창고 열기") +
+        qrow("제4장 · 탈출", f.memoGate ? "진행 중" : "시작 전", "출입증 + 정문 비밀번호(7반 봇의 시설팀 공지) + 박민희 프로님과 함께") +
+        qrow("사건 기록", loreN() >= STORY.length ? "완료" : loreN() ? "진행 중" : "시작 전", "7반 봇에서 오늘 밤의 기록 찾기 · " + loreN() + "/" + STORY.length) +
+        "<div class=\"small\" style=\"margin-top:10px;color:var(--accent)\">선택 (작은 도움)</div>" +
+        qrow("몬스터 배달", stt(f.jaewon), "이재원(305호)에게 몬스터 → 이동 속도 증가") +
+        qrow("젤리 구출", stt(f.minju), "고민주(10층)에게 젤리(20층) → 퀴즈 제한 시간 30초") +
+        qrow("초코파이 한 개 더", stt(f.minsu), "김민수(10층)에게 초코파이(2층) → 50:50 찬스 2회") +
+        qrow("삼국지 반납", stt(f.minji2), "정민지(303호)에게 강사실 삼국지 → 숨기 요령");
+    } else if (i === 2) {
+      el.innerHTML = "<h3>반 친구 (" + metCount() + "/" + M.length + ")</h3><div class=\"small\" style=\"margin-bottom:8px\">이야기를 나눈 친구는 눌러서 프로필을 볼 수 있다.</div><div class=\"roster\" id=\"roster\"></div>";
+      var box = $("roster");
+      M.forEach(function (d) {
+        var met = !!st.met[d.n];
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = met ? "" : "q";
+        b.appendChild(faceCanvas(d.n));
+        var sp = document.createElement("span");
+        sp.textContent = met ? d.n + " · " + MAPS[PLACE[d.n][0]].name.replace(/ .*/, "") : "???";
+        b.appendChild(sp);
+        b.addEventListener("click", function () {
+          if (met) {
+            profile(d);
+          }
+        });
+        box.appendChild(b);
+      });
+    } else if (i === 3) {
+      var rows = [["반", "SSAFY " + CLS.cohort + " " + CLS.region + " " + CLS.cls], ["소속", CLS.campus], ["트랙", CLS.track], ["담임", CLS.teacher], ["담당 프로", CLS.pro],
+        ["반장", CLS.leader], ["CA", CLS.ca], ["총원", CLS.total + "명"], ["취업자", CLS.employed + "명"], ["교실", CLS.room], ["식당", CLS.food], ["하는 일", CLS.doing]];
+      el.innerHTML = "<h3>반 정보</h3>" + rows.map(function (r) { return '<div class="prow"><b>' + esc(r[0]) + "</b><span>" + esc(r[1]) + "</span></div>"; }).join("");
+    } else if (i === 4) {
+      el.innerHTML = "<h3>챗봇 서버</h3><p class=\"small\">304호 컴퓨터(7반 봇)가 질문을 보낼 주소입니다. FastAPI 서버(GMS)의 /api/v1/chat 주소를 넣으세요. 비우면 게임 안 검색으로만 답합니다.</p>" +
+        '<div class="field"><input id="ep-in" aria-label="챗봇 서버 주소"><button type="button" class="wbtn" id="ep-save">저장</button><button type="button" class="wbtn" id="ep-test">연결 테스트</button></div><div class="small" id="ep-state"></div>';
+      $("ep-in").value = st.ep;
+      $("ep-save").addEventListener("click", function () {
+        st.ep = $("ep-in").value.trim();
+        checkpoint();
+        $("ep-state").textContent = st.ep ? "저장했습니다: " + st.ep : "비웠습니다. 게임 안 검색으로 답합니다.";
+      });
+      $("ep-test").addEventListener("click", function () {
+        st.ep = $("ep-in").value.trim();
+        checkpoint();
+        if (!st.ep) {
+          $("ep-state").textContent = "주소를 먼저 넣어 주세요.";
+          return;
+        }
+        $("ep-state").textContent = "'반장 누구야?'를 보내는 중…";
+        botAnswer("반장 누구야?", function (text, note) {
+          $("ep-state").textContent = note ? "연결 실패. " + note : "연결 성공. 응답: " + text.slice(0, 120);
+        }, true);
+      });
+    } else if (i === 5) {
+      el.innerHTML = "<h3>기록 (" + loreN() + "/" + STORY.length + ")</h3><p class=\"small\">복구된 7반 봇에게 물어봐서 찾은 문서들. 아직 못 찾은 기록도 있다.</p>" + STORY.map(function (d) {
+        return st.lore[d.id] ? '<div class="item"><b>' + esc(d.name) + "</b><span>" + esc(d.text) + "</span></div>" : '<div class="item"><b>???</b><span>' + (st.f.botFixed ? "7반 봇 어딘가에 있는 기록" : "7반 봇이 복구되면 찾을 수 있다") + "</span></div>";
+      }).join("");
+    }
+  }
+  function profile(d) {
+    var rows = [
+      ["있는 곳", MAPS[PLACE[d.n][0]].name],
+      ["출생", d.y + "년생 · " + gko(d.g)], ["소개글 속 나이", d.age ? ageText(d.age) : ""], ["역할", d.role || ""], ["전공", d.maj.join(", ")],
+      ["사는 곳", d.p + " (역삼까지 " + d.k.toFixed(1) + "km)"], ["취미", d.hob.length ? d.hob.join(", ") : (d.intro ? "없음" : "")],
+      ["요즘 상태", d.now], ["최근 한 일", d.recent], ["MBTI", d.mbti || ""], ["특이사항", d.note || ""],
+      ["마니또 추측", d.guess], ["마니또에게 준 것", d.gift], ["마니또에게 한마디", d.msg || ""]
+    ].filter(function (r) { return r[1]; });
+    $("menu-panel").innerHTML = '<div class="phead"><span id="ph-face"></span><div><div class="nm">' + esc(d.n) + "</div>" + (d.nick ? '<div class="small">닉네임 ' + esc(d.nick) + "</div>" : "") + "</div></div>" +
+      rows.map(function (r) { return '<div class="prow"><b>' + esc(r[0]) + "</b><span>" + esc(r[1]) + "</span></div>"; }).join("") +
+      '<div style="margin-top:10px"><button type="button" class="wbtn" id="ph-back">← 반 친구</button></div>';
+    $("ph-face").appendChild(faceCanvas(d.n));
+    $("ph-back").addEventListener("click", function () { menuPanel(2); });
+  }
+
+  /* ================= 엔딩 ================= */
+  function winGame() {
+    state = "win";
+    $("dlg").hidden = true;
+    $("codeform").hidden = true;
+    var sec = Math.floor(st.time / 1000);
+    var opt = [st.f.jaewon, st.f.minju, st.f.minsu, st.f.minji2].filter(function (v) { return v === 2; }).length;
+    $("win-txt").textContent = "정문이 열렸다. 박민희 프로님과 함께 밤공기 속으로 뛰쳐나왔다.\n뒤를 돌아보니, 2층 창문에 키 큰 그림자가 서 있다.\n…\"내일 과제 검사한데이.\"";
+    $("win-stats").innerHTML = [["플레이 시간", Math.floor(sec / 60) + "분 " + (sec % 60) + "초"], ["대화한 반 친구", metCount() + " / " + M.length], ["Django 퀴즈 정답", (st.quizOk || 0) + "회"], ["보충 수업", st.caught + "회"], ["선택 미션", opt + " / 4"], ["찾은 기록", loreN() + " / " + STORY.length]]
+      .map(function (r) { return "<span>" + esc(r[0]) + "</span><b>" + esc(r[1]) + "</b>"; }).join("");
+    $("winscr").hidden = false;
+    try {
+      localStorage.removeItem(SKEY);
+    } catch (e) {
+      /* 무시 */
+    }
+  }
+
+  /* ================= 입력 ================= */
+  var KEYDIR = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", w: "up", s: "down", a: "left", d: "right", W: "up", S: "down", A: "left", D: "right" };
+  function press(dir) {
+    if (held.indexOf(dir) < 0) {
+      held.push(dir);
+    }
+  }
+  function release(dir) {
+    held = held.filter(function (x) { return x !== dir; });
+  }
+  function onA() {
+    if (state === "quiz") {
+      quizAnswer(qz.sel);
+    } else if (state === "play" && !P.moving) {
+      interact();
+    } else if (state === "dialog") {
+      advance();
+    } else if (state === "choice") {
+      pick(ch.sel);
+    } else if (state === "menu") {
+      menuGo(menuSel);
+    } else if (state === "hide") {
+      unhide();
+    }
+  }
+  function onB() {
+    if (state === "play" && !P.moving) {
+      openMenu();
+    } else if (state === "dialog") {
+      advance();
+    } else if (state === "choice") {
+      pick(ch.opts.length - 1);
+    } else if (state === "menu") {
+      closeMenu();
+    } else if (state === "chat") {
+      closeChat();
+    } else if (state === "code") {
+      closeCode();
+    } else if (state === "hide") {
+      unhide();
+    }
+  }
+  function moveQuizSel(dir) {
+    var mv = { up: -2, down: 2, left: -1, right: 1 }[dir];
+    var k;
+    for (k = 0; k < 4; k++) {
+      qz.sel = (qz.sel + mv + 4) % 4;
+      if (qz.gone.indexOf(qz.sel) < 0) {
+        break;
+      }
+    }
+    renderQuiz();
+  }
+  function onNav(dir) {
+    if (state === "quiz" && !qz.locked) {
+      moveQuizSel(dir);
+      return;
+    }
+    if (state === "choice") {
+      if (dir === "up") {
+        ch.sel = (ch.sel + ch.opts.length - 1) % ch.opts.length;
+      }
+      if (dir === "down") {
+        ch.sel = (ch.sel + 1) % ch.opts.length;
+      }
+      renderChoice();
+    } else if (state === "menu") {
+      if (dir === "up") {
+        menuSel = (menuSel + MENU.length - 1) % MENU.length;
+      }
+      if (dir === "down") {
+        menuSel = (menuSel + 1) % MENU.length;
+      }
+      renderMenu();
+      if (menuSel < MENU.length - 1) {
+        menuPanel(menuSel);
+      }
+    }
+  }
+  document.addEventListener("keydown", function (e) {
+    auInit();
+    var tag = (e.target && e.target.tagName) || "";
+    if (tag === "INPUT" || tag === "TEXTAREA") {
+      if (e.key === "Escape") {
+        if (state === "chat") {
+          closeChat();
+        } else if (state === "code") {
+          closeCode();
+        }
+      }
+      return;
+    }
+    if (state === "quiz") {
+      e.preventDefault();
+      if (e.repeat || qz.locked) {
+        return;
+      }
+      if (/^[1-4]$/.test(e.key)) {
+        quizAnswer(Number(e.key) - 1);
+      } else if (e.key === "5" || e.key === "c" || e.key === "C") {
+        useChance();
+      } else if (KEYDIR[e.key]) {
+        moveQuizSel(KEYDIR[e.key]);
+      } else if (e.key === " " || e.key === "Enter" || e.key === "z" || e.key === "Z") {
+        quizAnswer(qz.sel);
+      }
+      return;
+    }
+    if (KEYDIR[e.key]) {
+      e.preventDefault();
+      if (state === "play") {
+        press(KEYDIR[e.key]);
+      } else if (!e.repeat) {
+        onNav(KEYDIR[e.key]);
+      }
+      return;
+    }
+    if (e.key === " " || e.key === "Enter" || e.key === "z" || e.key === "Z") {
+      e.preventDefault();
+      if (!e.repeat) {
+        onA();
+      }
+      return;
+    }
+    if (e.key === "Escape" || e.key === "x" || e.key === "X") {
+      e.preventDefault();
+      if (!e.repeat) {
+        onB();
+      }
+    }
+  });
+  document.addEventListener("keyup", function (e) {
+    if (KEYDIR[e.key]) {
+      release(KEYDIR[e.key]);
+    }
+  });
+  window.addEventListener("blur", function () { held = []; });
+  var dbtns = document.querySelectorAll("[data-dir]");
+  var di;
+  for (di = 0; di < dbtns.length; di++) {
+    (function (b) {
+      var dir = b.getAttribute("data-dir");
+      b.addEventListener("pointerdown", function (e) {
+        e.preventDefault();
+        auInit();
+        if (state === "play") {
+          press(dir);
+        } else {
+          onNav(dir);
+        }
+      });
+      ["pointerup", "pointerleave", "pointercancel"].forEach(function (ev) {
+        b.addEventListener(ev, function () { release(dir); });
+      });
+    })(dbtns[di]);
+  }
+  $("btn-a").addEventListener("pointerdown", function (e) {
+    e.preventDefault();
+    auInit();
+    onA();
+  });
+  $("btn-b").addEventListener("pointerdown", function (e) {
+    e.preventDefault();
+    onB();
+  });
+  $("dlg").addEventListener("click", function () {
+    if (state === "dialog") {
+      advance();
+    }
+  });
+  $("hidebox").addEventListener("click", function () {
+    if (state === "hide") {
+      unhide();
+    }
+  });
+  $("hud-menu").addEventListener("click", function () {
+    if (state === "play") {
+      openMenu();
+    } else if (state === "menu") {
+      closeMenu();
+    }
+  });
+  $("hud-snd").addEventListener("click", function () {
+    auInit();
+    auSetOn(!AU.on);
+  });
+  $("chatform").addEventListener("submit", onChat);
+  $("chat-quit").addEventListener("click", closeChat);
+  $("codeform").addEventListener("submit", onCode);
+  $("code-quit").addEventListener("click", closeCode);
+  $("quiz-chance").addEventListener("click", useChance);
+  $("over-retry").addEventListener("click", retry);
+  $("win-again").addEventListener("click", function () {
+    $("winscr").hidden = true;
+    startGame(true);
+  });
+
+  /* ================= 갱신 ================= */
+  function update() {
+    typeTick();
+    if (state === "play" || state === "hide" || state === "dialog") {
+      gt += 1000 / 60;
+    }
+    if (state === "play" || state === "hide") {
+      st.time += 1000 / 60;
+      teacherUpdate();
+      eerieTick();
+    }
+    musicTick();
+    if (state !== "play") {
+      return;
+    }
+    if (P.moving) {
+      var prevT = P.t;
+      P.t += st.f.boost ? 16 / 6 : 2;
+      if (prevT < 6 && P.t >= 6) {
+        stepPlayer();
+      }
+      if (P.t >= TS) {
+        P.x = P.fx;
+        P.y = P.fy;
+        P.moving = false;
+        P.t = 0;
+        P.step = (P.step + 1) % 2;
+        var ex = MAPS[P.map].exits[P.x + "," + P.y];
+        if (ex) {
+          goMap(ex.map, ex.x, ex.y, ex.dir, false);
+          return;
+        }
+      }
+    }
+    if (!P.moving && held.length) {
+      var dir = held[held.length - 1];
+      P.dir = dir;
+      var nx = P.x + DV[dir][0];
+      var ny = P.y + DV[dir][1];
+      var ex2 = MAPS[P.map].exits[nx + "," + ny];
+      if (ex2 && ex2.need && !has(ex2.need)) {
+        held = [];
+        say([narr(ex2.lockMsg)]);
+        return;
+      }
+      if (walkableP(P.map, nx, ny)) {
+        P.moving = true;
+        P.fx = nx;
+        P.fy = ny;
+        P.t = 0;
+      }
+    }
+    NPCS.forEach(function (n) {
+      if (n.map !== P.map) {
+        return;
+      }
+      if (Math.abs(n.x - P.x) + Math.abs(n.y - P.y) > 1 && gt > n.turnAt) {
+        n.turnAt = gt + 2500 + Math.random() * 4000;
+        n.dir = Math.random() < 0.55 ? n.home : rand(DIRS);
+      }
+    });
+  }
+
+  /* ================= 그리기 ================= */
+  function drawBoss(x0, y0, dir, f, chase) {
+    var size = SC * 1.0;
+    var w = BW * size;
+    var h = BH * size;
+    var bx = x0 + (TS * SC - w) / 2;
+    var by = y0 + TS * SC - h + 2 * SC;
+    if (chase) {
+      bx += Math.round((Math.random() - 0.5) * 2) * SC * 0.5;
+      g.fillStyle = "rgba(255,0,20," + (0.12 + 0.08 * Math.sin(gt / 90)) + ")";
+      g.beginPath();
+      g.ellipse(bx + w / 2, by + h * 0.45, w * 0.7, h * 0.55, 0, 0, Math.PI * 2);
+      g.fill();
+    }
+    g.fillStyle = "rgba(0,0,0,0.5)";
+    g.beginPath();
+    g.ellipse(bx + w / 2, by + h - 2 * SC, w * 0.38, 3 * SC, 0, 0, Math.PI * 2);
+    g.fill();
+    g.drawImage(BOSS, (f % 2) * BW * 2, DIRS.indexOf(dir) * BH * 2, BW * 2, BH * 2, bx, by, w, h);
+  }
+  function draw() {
+    var m = MAPS[P.map];
+    var px = P.moving ? P.x + (P.fx - P.x) * (P.t / TS) : P.x;
+    var py = P.moving ? P.y + (P.fy - P.y) * (P.t / TS) : P.y;
+    var camX = m.w <= VW ? (m.w * TS - VW * TS) / 2 : Math.max(0, Math.min(px * TS + 8 - (VW * TS) / 2, m.w * TS - VW * TS));
+    var camY = m.h <= VH ? (m.h * TS - VH * TS) / 2 : Math.max(0, Math.min(py * TS + 8 - (VH * TS) / 2, m.h * TS - VH * TS));
+    camX = Math.round(camX * SC) / SC;
+    camY = Math.round(camY * SC) / SC;
+    var sx = 0;
+    var sy = 0;
+    if (gt < FX.shakeUntil) {
+      sx = (Math.random() - 0.5) * 12;
+      sy = (Math.random() - 0.5) * 12;
+    }
+    g.setTransform(1, 0, 0, 1, sx, sy);
+    g.fillStyle = "#000";
+    g.fillRect(-20, -20, cv.width + 40, cv.height + 40);
+    g.drawImage(m.layer, Math.round(-camX * SC), Math.round(-camY * SC));
+    var ents = NPCS.filter(function (n) { return n.map === P.map; }).map(function (n) {
+      return { x: n.x, y: n.y, dir: n.dir, f: 0, sheet: n.sheet };
+    });
+    if (!P.hidden) {
+      ents.push({ x: px, y: py, dir: P.dir, f: P.moving ? 1 + ((Math.floor(P.t / 8) + P.step) % 2) : 0, sheet: SHEETS["나"] });
+    }
+    var tVis = teacherVisible();
+    if (tVis) {
+      var tx = TCH.moving ? TCH.x + (TCH.fx - TCH.x) * TCH.t / TS : TCH.x;
+      var ty = TCH.moving ? TCH.y + (TCH.fy - TCH.y) * TCH.t / TS : TCH.y;
+      ents.push({ x: tx, y: ty, dir: TCH.dir, f: TCH.moving ? Math.floor(TCH.t / 8) % 2 : 0, boss: true });
+    }
+    if (SCARE && SCARE.map === P.map && gt < SCARE.until) {
+      ents.push({ x: SCARE.x, y: SCARE.y, dir: "down", f: 0, boss: true, ghost: true });
+    }
+    ents.sort(function (a, b) { return a.y - b.y; });
+    ents.forEach(function (e) {
+      var dx = Math.round((e.x * TS - camX) * SC);
+      var dy = Math.round((e.y * TS - camY - 4) * SC);
+      if (e.boss) {
+        if (e.ghost) {
+          g.globalAlpha = 0.55 + 0.3 * Math.sin(gt / 40);
+        }
+        drawBoss(dx, dy, e.dir, e.f, !e.ghost && TCH.state === "chase");
+        g.globalAlpha = 1;
+        return;
+      }
+      g.fillStyle = "rgba(0,0,0,0.25)";
+      g.fillRect(dx + 4 * SC, dy + 15 * SC, 8 * SC, 2 * SC);
+      g.drawImage(e.sheet, e.f * TS, DIRS.indexOf(e.dir) * TS, TS, TS, dx, dy, TS * SC, TS * SC);
+    });
+    var darkMap = { b1: 0.55, hall4: 0.5, server: 0.45, r303: 0.4, office: 0.38, lobby: 0.35 };
+    var dark = darkMap[P.map] || 0.3;
+    if (gt < FX.flickerUntil && Math.random() < 0.45) {
+      dark = 0.85;
+    }
+    g.fillStyle = "rgba(4, 6, 24, " + dark + ")";
+    g.fillRect(-20, -20, cv.width + 40, cv.height + 40);
+    var lx0 = Math.round((px * TS - camX + 8) * SC);
+    var ly0 = Math.round((py * TS - camY + 4) * SC);
+    var grad = g.createRadialGradient(lx0, ly0, 50, lx0, ly0, 400);
+    grad.addColorStop(0, "rgba(0,0,0,0)");
+    grad.addColorStop(1, "rgba(0,0,0," + Math.min(0.85, dark + 0.25) + ")");
+    g.fillStyle = grad;
+    g.fillRect(-20, -20, cv.width + 40, cv.height + 40);
+    if (tVis && TCH.state === "chase" && TCH.dir !== "up") {
+      var ex = Math.round(((TCH.moving ? TCH.x + (TCH.fx - TCH.x) * TCH.t / TS : TCH.x) * TS - camX) * SC);
+      var ey = Math.round(((TCH.moving ? TCH.y + (TCH.fy - TCH.y) * TCH.t / TS : TCH.y) * TS - camY - 4) * SC);
+      var bx = ex + (TS * SC - BW * SC) / 2;
+      var by = ey + TS * SC - BH * SC + 2 * SC;
+      var bobE = TCH.moving ? Math.floor(TCH.t / 8) % 2 : 0;
+      (EYES[TCH.dir] || []).forEach(function (p) {
+        var cxE = bx + p[0] * SC;
+        var cyE = by + (p[1] + bobE) * SC;
+        g.fillStyle = "rgba(255,20,30,0.35)";
+        g.fillRect(cxE - 2, cyE - 2, 7, 7);
+        g.fillStyle = "rgba(255,40,50,0.95)";
+        g.fillRect(cxE, cyE, 3, 3);
+      });
+    }
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    if (state === "play" && !P.moving) {
+      var v = DV[P.dir];
+      var target = npcAt(P.map, P.x + v[0], P.y + v[1]);
+      if (target) {
+        var lx = Math.round((target.x * TS - camX + 8) * SC);
+        var ly = Math.round((target.y * TS - camY - 8) * SC);
+        g.font = "bold 15px " + getComputedStyle(document.body).fontFamily;
+        var w = g.measureText(target.name).width + 14;
+        g.fillStyle = "rgba(13,20,64,0.92)";
+        g.fillRect(lx - w / 2, ly - 20, w, 22);
+        g.strokeStyle = "#F4F1E8";
+        g.lineWidth = 2;
+        g.strokeRect(lx - w / 2, ly - 20, w, 22);
+        g.fillStyle = "#FFD25E";
+        g.textAlign = "center";
+        g.textBaseline = "middle";
+        g.fillText(target.name, lx, ly - 9);
+      }
+    }
+    var dang = 0;
+    if (tVis && TCH.state === "chase") {
+      var dd = Math.abs(TCH.x - P.x) + Math.abs(TCH.y - P.y);
+      dang = Math.max(0.25, Math.min(1, 1 - (dd - 1) / 10));
+    } else if (TCH.state === "enter" && TCH.map === P.map && TCH.at - gt < 3000) {
+      dang = 0.25;
+    }
+    $("danger").style.opacity = String(dang);
+  }
+  function loop() {
+    update();
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  /* ================= 시작 ================= */
+  function startGame(isNew) {
+    auInit();
+    if (isNew || !CK) {
+      var ep = st.ep;
+      st = fresh();
+      st.ep = ep || DEFAULT_EP;
+    } else {
+      st = JSON.parse(JSON.stringify(CK));
+    }
+    st.lore = st.lore || {};
+    applyWorld();
+    P.map = st.map;
+    P.x = st.x;
+    P.y = st.y;
+    P.dir = st.dir;
+    P.moving = false;
+    P.hidden = false;
+    P.entry = { x: P.x, y: P.y };
+    TCH.state = "off";
+    if (st.f.chase) {
+      TCH.state = "away";
+      TCH.map = P.map;
+      TCH.at = gt + 12000;
+    }
+    ["title", "over", "winscr"].forEach(function (id) {
+      $(id).hidden = true;
+    });
+    state = "play";
+    hud();
+    showLoc();
+    checkpoint();
+    if (isNew) {
+      say([
+        narr("…눈을 떠 보니 304호 교실이다. 자습하다 깜빡 잠들었나 보다."),
+        narr("밤 10시. 휴대폰 신호가 잡히지 않는다.", function () { flicker(900); }),
+        narr("멀리서 쿵… 쿵… 무거운 발소리가 울린다.", function () { stepBoss(0.35, -0.6); setTimeout(function () { stepBoss(0.4, -0.5); }, 700); }),
+        narr("아직 건물에 남은 반 친구들이 있는 것 같다.\n먼저 교탁을 조사해 보자."),
+        narr("(방향키 이동 · Space 대화·조사 · Esc 메뉴에서 미션 확인)")
+      ]);
+    }
+  }
+  $("t-new").addEventListener("click", function () { startGame(true); });
+  $("t-cont").addEventListener("click", function () { startGame(false); });
+  if (hasSave) {
+    $("t-cont").hidden = false;
+  }
+  $("hud-snd").textContent = AU.on ? "소리 켬" : "소리 끔";
+  hud();
+  loop();
+})();
+</script>
+</body>
+</html>
